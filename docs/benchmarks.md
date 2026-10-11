@@ -86,8 +86,8 @@ Benchmarks are conducted by firing the network event 1000 times per frame with t
 | QuickNet | 190.90 | 74.63
 
 ### Call-Response Test (500 numbers)
-
 Call-response refers to the networking behavior of RemoteFunctions. Even though this functionality is quite useful, some libraries do not support it (marked as "N/A" below). In this test, each invoke is wrapped in a task.spawn to ensure calls aren't blocked. This introduces some noise so the actual performance differences are greater than that shown. Note there's an issue where Stats.DataReceiveKbps always returns 0, so the receive Kbps is inferred from the send Kbps by returning the exact same data that's sent.
+
 | Networking Tool | FPS | Send Kbps | Receive Kbps 
 |--------------------|------------------------|--------------------|----------------
 | RemoteFunction | 15.44 | 764181.29 | 764181.29

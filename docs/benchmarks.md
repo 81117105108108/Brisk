@@ -59,7 +59,7 @@ Benchmarks are conducted by firing the network event 1000 times per frame with t
 | Blink | 44.56	| 64.77
 | QuickNet | 97.01 | 65.60
 
-### Dictionary Test (200 dictionaries)
+### Dictionary Test (200 key-value pairs)
 
 | Networking Tool | FPS | Kbps |
 |--------------------|------------------------|--------------------

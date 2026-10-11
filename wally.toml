@@ -1,0 +1,11 @@
+[package]
+name = "breadboardengineer1234/quicknet"
+description = "High performance networking"
+version = "0.4.0"
+license = "MIT"
+registry = "https://github.com/UpliftGames/wally-index"
+repository = "https://github.com/breadboardengineer1234/QuickNet"
+exclude = ["benchmarks", "docs", "README.md"]
+realm = "shared"
+
+[dependencies]

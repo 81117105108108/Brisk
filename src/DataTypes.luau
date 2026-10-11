@@ -58,6 +58,8 @@ local dataTypes = {
 	Region3 = Enums.Region3 :: Region3,
 	PhysicalProperties = Enums.PhysicalProperties :: PhysicalProperties,
 	Rect = Enums.Rect :: Rect,
+	Font = Enums.Font :: Font,
+	Ray = Enums.Ray :: Ray,
 	
 	--custom
 	Any = Enums.Any :: any,
@@ -65,6 +67,7 @@ local dataTypes = {
 	union = Parser.union,
 	unionMany = Parser.unionMany,
 	literal = Parser.literal,
+	custom = Parser.custom,
 }
 
 return dataTypes

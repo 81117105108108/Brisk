@@ -52,6 +52,8 @@ local module = {
 	[47] = "Region3",
 	[48] = "PhysicalProperties",
 	[49] = "Rect",
+	[50] = "Font",
+	[51] = "Ray",
 	
 }
 

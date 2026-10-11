@@ -1,7 +1,9 @@
 --!optimize 2
 
---[QuickNet] v0.3.5
---author: u5eful
+--[[
+QuickNet
+author: u5eful
+]]
 
 --Services--
 local RunService = game:GetService("RunService")
@@ -16,33 +18,34 @@ local Config = require(script.Config)
 local Types = require(script.Types)
 
 --Config--
-local SOURCE = "[QuickNet]"
-local DEBUG_MODE = Config.DebugMode
-local RATE_LIMIT = Config.DefaultRateLimit
-local MAX_CALLS_PER_FRAME = Config.MaxCallsPerFrame
-local INVOKE_TIMEOUT = Config.DefaultResponseTimeout
-local MAX_INVOKE_TIMEOUT = 300
-local MAX_PAYLOAD_SIZE = Config.MaxPacketSize
-local ERROR_MSGS = {
-	InvalidInternalArg1 = "invalid internal argument 1",
-	InvalidInternalArg2 = "invalid internal argument 2",
+const VERSION = "v0.4.0"
+const SOURCE = "[QuickNet]"
+const DEBUG_MODE = Config.DebugMode
+const RATE_LIMIT = Config.DefaultRateLimit
+const MAX_CALLS_PER_FRAME = Config.MaxCallsPerFrame
+const INVOKE_TIMEOUT = Config.DefaultResponseTimeout
+const MAX_INVOKE_TIMEOUT = 300
+const MAX_PAYLOAD_SIZE = Config.MaxPacketSize
+const ERROR_MSGS = {
+	InvalidInternalArg1 = "invalid internal argument 1: expected buffer",
+	InvalidInternalArg2 = "invalid internal argument 2: expected instance table or nil",
 	Unreliable1 = "Network function cannot be unreliable",
 	Response1 = "Unreliable event does not support response",
 }
-local MAX_REQ_ID_RANGE = 65536
-local CLIENT_TEMP_BUFF_SIZE = Config.ClientAllocationSize
-local SERVER_TEMP_BUFF_SIZE = Config.ServerAllocationSize
-local REMOTE_EVENT = 0
-local REMOTE_FUNCTION = 1
-local INVOKE_FAIL_ID = 0
-local TBL_POOL_SIZE = 100
+const MAX_REQ_ID_RANGE = 65536
+const CLIENT_TEMP_BUFF_SIZE = Config.ClientAllocationSize
+const SERVER_TEMP_BUFF_SIZE = Config.ServerAllocationSize
+const REMOTE_EVENT = 0
+const REMOTE_FUNCTION = 1
+const INVOKE_FAIL_ID = 0
+const TBL_POOL_SIZE = 100
 
 --Types--
-type Signal<T...> = Types.Signal<T...>
 export type NetworkEvent<A... = ()> = Types.NetworkEvent<A...>
 export type NetworkFunction<A... = (), B... = ()> = Types.NetworkFunction<A..., B...>
+export type Connection = Types.Connection
+type Signal<T...> = Types.Signal<T...>
 type NetworkInfo<A..., B...> = Types.NetworkInfo<A..., B...>
-export type QuickNetConnection = Types.QuickNetConnection
 type SchemaArg = Types.SchemaArg
 type Queue = Types.Queue
 
@@ -61,6 +64,7 @@ local isServer = RunService:IsServer()
 local getSchema = Parser.getSchema
 local encodeData = Serialize.encode
 local decodeData = Serialize.decode
+local queueCapacity = .8 * (isServer and SERVER_TEMP_BUFF_SIZE or CLIENT_TEMP_BUFF_SIZE)
 local eventsInfo: {[number]: NetworkInfo<(), ()>} = {}
 local namesRegistered: {[string]: boolean} = {}
 local rateLimitInfo: {[Player]: {[string]: {Timestamp: number, NumSends: number}}} = {}
@@ -69,7 +73,7 @@ local asyncThreadsPool: {thread} = {}
 local timeoutTasks: {[number]: thread} = {}
 local globalReqId: number = -1
 local globalEventId: number = 0
-local buffersCache: {[number]: {buffer}} = {}
+local buffersCache: {[number]: buffer} = {}
 local buffersCacheSize = 0
 local clientQueue: Queue?
 local clientQueueUnr: Queue?
@@ -93,7 +97,7 @@ end
 
 @native local function recycleTable(tbl: {any})
 	local poolIdx = #tablePool
-	if poolIdx > TBL_POOL_SIZE then
+	if poolIdx >= TBL_POOL_SIZE then
 		return
 	end
 	table.clear(tbl)
@@ -101,14 +105,14 @@ end
 end
 
 local function errorMsg(msg: string)
-	error(SOURCE.." "..msg, 3)
+	error(`{SOURCE} {msg}`, 3)
 end
 
 local function warnMsg(msg: string, bypassDebugMode: boolean?)
 	if not DEBUG_MODE and not bypassDebugMode then
 		return
 	end
-	warn(SOURCE.." "..msg)
+	warn(`{SOURCE} {msg}`)
 end
 
 local function getRemote(name: string): RemoteEvent
@@ -135,17 +139,20 @@ local function getUnreliable(name: string): UnreliableRemoteEvent
 	return unreliable
 end
 
-@native local function cacheBuffer(buff: buffer, size: number)
+@native local function cacheBuffer(buff: buffer, size: number)	
 	if buffersCacheSize > 9 then
 		local k = next(buffersCache)
 		buffersCache[k] = nil
-	else
+		buffersCacheSize -= 1
+	end
+	local existing = buffersCache[size]
+	if not existing then
 		buffersCacheSize += 1
 	end
 	buffersCache[size] = buff
 end
 
-@native local function getBufferFromCache(size: number)
+@native local function getBufferFromCache(size: number): buffer?
 	local buff = buffersCache[size]
 	if buff then
 		buffersCache[size] = nil
@@ -237,6 +244,11 @@ end
 	if not queue then return end
 	local offset = queue.ByteSize
 	local buff = queue.TempBuffer
+	if offset > queueCapacity then
+		warnMsg(`Cannot queue event: exceeded static allocation size ({queueCapacity} bytes)`)
+		return
+	end
+
 	buffer.writeu8(buff, offset, actionId)
 	local bytes = 1
 	if networkType == REMOTE_FUNCTION then
@@ -265,6 +277,13 @@ end
 @native local function queueEventSerialized(queue: Queue, sourceBuff: buffer, start: number, bytes: number,
 	sourceInst: {Instance}, instStart: number, instCount: number)
 	if not queue then return end
+	local offset = queue.ByteSize
+	local buff = queue.TempBuffer
+	if offset + bytes > queueCapacity then
+		warnMsg(`Cannot queue event: exceeded static allocation size of ({queueCapacity} bytes)`)
+		return
+	end
+
 	if instCount > 0 then
 		local inst = queue.Instances
 		local instSize = #inst
@@ -275,8 +294,6 @@ end
 		end
 	end
 		
-	local offset = queue.ByteSize
-	local buff = queue.TempBuffer
 	buffer.copy(buff, offset, sourceBuff, start, bytes)
 	queue.QueueSize += 1
 	queue.ByteSize += bytes
@@ -286,7 +303,7 @@ local function getEventId(name: string): number?
 	if isServer then
 		globalEventId += 1
 		if globalEventId > 255 then
-			errorMsg("Max number of network events is 255")
+			errorMsg("Unable to register event: max number of events allowed is 255")
 			return
 		end
 		internalRemote:SetAttribute(name, globalEventId)
@@ -299,7 +316,7 @@ local function getEventId(name: string): number?
 		id = internalRemote:GetAttribute(name)
 	end
 	if not id then
-		errorMsg("Unable to get action id for "..name)
+		errorMsg(`Unable to get action id for {name}`)
 	end
 	return id
 end
@@ -322,7 +339,7 @@ end
 	local exceeded = info.NumSends >= rateLimitConfig.Max
 
 	if exceeded and onCooldown then
-		warnMsg(player.Name.."'s rate limit exceeded for "..name)
+		warnMsg(`{player.Name}'s rate limit exceeded for {name}`)
 		return true
 	end
 	
@@ -350,20 +367,21 @@ end
 end
 
 @native local function fastUnpack(tbl: {any}, len: number): ...any
-	if len < 2 then
+	if len == 1 then
 		return tbl[1]
 		
-	elseif len < 5 then
-		return tbl[1], tbl[2], tbl[3], tbl[4]
+	elseif len == 0 then
+		return
+			
+	elseif len == 2 then
+		return tbl[1], tbl[2]
 		
-	elseif len < 9 then
-		return tbl[1], tbl[2], tbl[3], tbl[4], tbl[5], tbl[6], tbl[7], tbl[8]
 	else
 		return table.unpack(tbl, 1, len)
 	end
 end
 
-@native local function getInvokeResults(...): (boolean, {any})
+@native local function getInvokeResults(...): (boolean, {any} | string)
 	local success = select(1, ...)	
 	if not success then
 		local err = select(2, ...)
@@ -377,7 +395,7 @@ end
 @native local function runCallback(callback, thread, responseSchema, actionId, reqId, ...)
 	if reqId then
 		local player = select(1, ...)
-		local success, result = getInvokeResults(pcall(callback, ...))
+		local success, result = getInvokeResults(xpcall(callback, debug.traceback, ...))
 		if success then
 			queueEvent(serverQueue[player], responseSchema, result, actionId, reqId, REMOTE_FUNCTION)
 		else
@@ -385,7 +403,7 @@ end
 			queueEvent(serverQueue[player], nil, nil, INVOKE_FAIL_ID, reqId, REMOTE_FUNCTION)
 		end
 	else
-		local success, err = pcall(callback, ...)
+		local success, err = xpcall(callback, debug.traceback, ...)
 		if not success then warnMsg(err, true) end
 	end
 	asyncThreadsPool[#asyncThreadsPool + 1] = thread
@@ -410,24 +428,65 @@ end
 	return thread
 end
 
-@native local function disconnect(self: QuickNetConnection)
+@native local function disconnect(self: Connection)
 	if not self.Connected then return end
-	self.Connected = false
-	self._callbacks[self] = nil
-	self._callbacks = nil
+	self.Connected = false	
+	if self._prev == nil then --head
+		local nextNode = self._next
+		if nextNode then
+			nextNode._prev = nil
+		end
+		self._signal._head = nextNode
+	else
+		local prev = self._prev
+		local nextNode = self._next
+		prev._next = nextNode
+
+		if nextNode then
+			nextNode._prev = prev
+		end
+	end
 end
 
-@native local function getNetworkConnection(callbacks: {[QuickNetConnection]: (...any) -> (...any)}, 
-	callback: (...any) -> (...any)): QuickNetConnection
-	local networkConn = {
-		Connected = true,
-		Disconnect = disconnect,
-		Destroy = disconnect,
-		_callbacks = callbacks,
-	} :: QuickNetConnection
+local Connection = {}
+Connection.__index = Connection
+Connection.Disconnect = disconnect
 
-	callbacks[networkConn] = callback
-	return networkConn
+@native local function connect<T...>(signal, 
+	callback: (T...) -> ()): Connection
+	local head = signal._head
+	local node = {
+		Connected = true,
+		_callback = callback,
+		_next = nil,
+		_prev = nil,
+		_signal = signal,
+	}
+	
+	if head then --insert node to the front
+		head._prev = node
+		node._next = head
+	end
+	signal._head = node
+	return setmetatable(node, Connection)
+end
+
+@native local function fireSync(signal, ...)
+	local node = signal._head
+	while node ~= nil do
+		local success, err = xpcall(node._callback, debug.traceback, ...)
+		if not success then warnMsg(err, true) end
+		node = node._next
+	end
+end
+
+@native local function fireAsync(signal, ...)
+	local node = signal._head
+	while node ~= nil do
+		local thread = getThread()
+		coroutine.resume(thread, node._callback, thread, ...)
+		node = node._next
+	end
 end
 
 @native local function remoteListenerServer(player: Player, buff: buffer, inst: {Instance}?)
@@ -437,7 +496,7 @@ end
 	end
 
 	if buffer.len(buff) > MAX_PAYLOAD_SIZE then
-		warnMsg(player.Name.." exceeded max packet size, dropping calls")
+		warnMsg(`{player.Name} exceeded max packet size, dropping calls`)
 		return
 	end
 
@@ -453,15 +512,14 @@ end
 
 	for i = 1, numCalls do
 		if i > MAX_CALLS_PER_FRAME then
-			warnMsg("max calls per frame exceeded for "..player.Name..
-				", further calls for this frame will be dropped")
+			warnMsg(`max calls per frame exceeded for {player.Name}, additional calls from this player will be dropped for this batch`)
 			return
 		end
 		local id = buffer.readu8(buff, offset)
 		offset += 1
 		local info: NetworkInfo<(), ()> = eventsInfo[id]
 		if not info then
-			warnMsg("unknown event id "..id..", dropping calls")
+			warnMsg(`unknown event id {id}, likely causes: incorrect schema definition caused cursor misalignment, or client sent malicious buffer`)
 			return
 		end
 		
@@ -471,14 +529,16 @@ end
 		local numArgs = #schema
 		local name = info.Name
 		local reqId = 0
+		
 		if isRemoteFunction then
 			reqId = buffer.readu16(buff, offset)				
 			offset += 2
 		end
+
 		local args, bytesRead = getArgs(buff, offset, schema, inst)
 		offset += bytesRead	
-		local rateLimited = checkRateLimit(player, name, info.RateLimit)
-		if rateLimited then
+		
+		if checkRateLimit(player, name, info.RateLimit) then
 			if isRemoteFunction then
 				queueEvent(serverQueue[player], nil, nil, INVOKE_FAIL_ID, reqId, networkType)
 			end
@@ -498,7 +558,7 @@ end
 				continue
 			end
 
-			local success, result = getInvokeResults(pcall(callback, player, fastUnpack(args, numArgs)))
+			local success, result = getInvokeResults(xpcall(callback, debug.traceback, player, fastUnpack(args, numArgs)))
 			if not success then
 				warnMsg(result, true)
 				queueEvent(serverQueue[player], nil, nil, INVOKE_FAIL_ID, reqId, networkType)
@@ -507,16 +567,9 @@ end
 			end
 			continue
 		end
-
-		for _, callback in info.Callbacks do
-			local success, err = pcall(callback, player, fastUnpack(args, numArgs))
-			if not success then warnMsg(err, true) end
-		end
 		
-		for _, callback in info.AsyncCallbacks do
-			local thread = getThread()
-			coroutine.resume(thread, callback, thread, nil, nil, nil, player, fastUnpack(args, numArgs))
-		end
+		fireSync(info.Signal, player, fastUnpack(args, numArgs))
+		fireAsync(info.AsyncSignal, nil, nil, nil, player, fastUnpack(args, numArgs))
 	end
 end
 
@@ -533,7 +586,7 @@ end
 	if cor and coroutine.status(cor) ~= "dead" then
 		local ok, err = coroutine.resume(cor, ...)
 		if not ok then
-			warnMsg(err, true)
+			warnMsg(debug.traceback(err), true)
 		end
 	end
 	local timeoutTask = timeoutTasks[reqId]
@@ -564,7 +617,7 @@ end
 		
 		local info: NetworkInfo<(), ()> = eventsInfo[id]
 		if not info then
-			warnMsg("unknown event id "..id..", dropping calls")
+			warnMsg(`unknown event id {id}: server likely fired before client initialized`, true)
 			return
 		end
 		
@@ -585,16 +638,9 @@ end
 			resumeInvokeThread(reqId, true, fastUnpack(args, numArgs))
 			continue
 		end
-
-		for _, callback in info.Callbacks do
-			local success, err = pcall(callback, fastUnpack(args, numArgs))
-			if not success then warnMsg(err, true) end
-		end
-
-		for _, callback in info.AsyncCallbacks do
-			local thread = getThread()
-			coroutine.resume(thread, callback, thread, nil, nil, nil, fastUnpack(args, numArgs))
-		end
+		
+		fireSync(info.Signal, fastUnpack(args, numArgs))
+		fireAsync(info.AsyncSignal, nil, nil, nil, fastUnpack(args, numArgs))
 	end
 end
 
@@ -637,9 +683,9 @@ end
 local function createObjServer<A..., B...>(info: NetworkInfo<A..., B...>): NetworkEvent<A...>
 	local Object = {}
 	Object.OnServerEvent = {}
-
-	local callbacks = info.Callbacks
-	local asyncCallbacks = info.AsyncCallbacks
+	
+	local signal = info.Signal
+	local asyncSignal = info.AsyncSignal
 	local name = info.Name	
 	local schema = info.SendSchema
 	local actionId = info.Id
@@ -648,6 +694,13 @@ local function createObjServer<A..., B...>(info: NetworkInfo<A..., B...>): Netwo
 	local isUnreliable = false
 	
 	function Object:SetRateLimit(max: number, timeWindow: number): NetworkEvent<A...>
+		if max < 0 then
+			errorMsg("Rate limit cannot be negative")
+		end
+		if timeWindow < 0 then
+			errorMsg("Rate limit time cannot be negative")
+		end
+		
 		info.RateLimit.Max = max
 		info.RateLimit.Time = timeWindow
 		return Object
@@ -665,7 +718,7 @@ local function createObjServer<A..., B...>(info: NetworkInfo<A..., B...>): Netwo
 	
 	function Object:Response(...: B...): NetworkFunction<A..., B...>
 		if isUnreliable then
-			errorMsg(SOURCE..ERROR_MSGS.Response1)
+			errorMsg(ERROR_MSGS.Response1)
 		end
 		Object.OnServerInvoke = nil
 		Object.OnServerInvokeAsync = nil
@@ -674,23 +727,27 @@ local function createObjServer<A..., B...>(info: NetworkInfo<A..., B...>): Netwo
 		info.NetworkType = REMOTE_FUNCTION
 		
 		function Object:SetResponseTimeout(val: number): NetworkFunction<A..., B...>
+			if val > MAX_INVOKE_TIMEOUT or val < 0 then
+				errorMsg(`Response timeout must be between 0 and {MAX_INVOKE_TIMEOUT}`)
+				return
+			end
 			info.ResponseTimeout = val
 			return Object
 		end	
 		return Object
 	end
 	
-	function Object.OnServerEvent:Connect(callback: (player: Player, A...) -> ()): QuickNetConnection
-		return getNetworkConnection(callbacks, callback)
+	function Object.OnServerEvent:Connect(callback: (player: Player, A...) -> ()): Connection
+		return connect(signal, callback)
 	end
 	
-	function Object.OnServerEvent:ConnectAsync(callback: (player: Player, A...) -> ()): QuickNetConnection
-		return getNetworkConnection(asyncCallbacks, callback)
+	function Object.OnServerEvent:ConnectAsync(callback: (player: Player, A...) -> ()): Connection
+		return connect(asyncSignal, callback)
 	end
 	
-	function Object.OnServerEvent:Once(callback: (player: Player, A...) -> ()): QuickNetConnection
+	function Object.OnServerEvent:Once(callback: (player: Player, A...) -> ()): Connection
 		local conn
-		conn = self:ConnectAsync(function(...)
+		conn = connect(asyncSignal, function(...)
 			disconnect(conn)
 			callback(...)
 		end)
@@ -700,7 +757,7 @@ local function createObjServer<A..., B...>(info: NetworkInfo<A..., B...>): Netwo
 	function Object.OnServerEvent:Wait(): A...
 		local cor = coroutine.running()
 		local conn
-		conn = self:Connect(function(...)
+		conn = connect(signal, function(...)
 			disconnect(conn)
 			if coroutine.status(cor) == "suspended" then
 				coroutine.resume(cor, ...)
@@ -729,7 +786,7 @@ end
 
 local function timeout(reqId: number, seconds: number, name: string)
 	resumeInvokeThread(reqId)
-	warnMsg("Response for "..name.." timed out after "..seconds.."s", true)
+	warnMsg(`Response for {name} timed out after {seconds}s`, true)
 end
 
 local function createObjClient<A..., B...>(info: NetworkInfo<A..., B...>): NetworkEvent<A...>
@@ -737,6 +794,13 @@ local function createObjClient<A..., B...>(info: NetworkInfo<A..., B...>): Netwo
 	Object.OnClientEvent = {}
 	
 	function Object:SetRateLimit(max: number, timeWindow: number): NetworkEvent<A...>
+		if max < 0 then
+			errorMsg("Rate limit cannot be negative")
+		end
+		if timeWindow < 0 then
+			errorMsg("Rate limit time cannot be negative")
+		end
+		
 		info.RateLimit.Max = max
 		info.RateLimit.Time = timeWindow
 		return Object
@@ -745,15 +809,15 @@ local function createObjClient<A..., B...>(info: NetworkInfo<A..., B...>): Netwo
 	local name = info.Name
 	local actionId = info.Id
 	local sendSchema = info.SendSchema
-	local callbacks = info.Callbacks
-	local asyncCallbacks = info.AsyncCallbacks
+	local signal = info.Signal
+	local asyncSignal = info.AsyncSignal
 	local networkType = info.NetworkType
 	local queue = clientQueue
-	local isUnreliable = false
-	
+	local isUnreliable = false	
+
 	function Object:Unreliable(): NetworkEvent<A...>
 		if networkType == REMOTE_FUNCTION then
-			errorMsg(SOURCE..ERROR_MSGS.Unreliable1)
+			errorMsg(ERROR_MSGS.Unreliable1)
 			return
 		end
 		isUnreliable = true
@@ -763,7 +827,7 @@ local function createObjClient<A..., B...>(info: NetworkInfo<A..., B...>): Netwo
 	
 	function Object:Response(...: B...): NetworkFunction<A..., B...>
 		if isUnreliable then
-			errorMsg(SOURCE..ERROR_MSGS.Response1)
+			errorMsg(ERROR_MSGS.Response1)
 			return
 		end
 		info.ResponseSchema = getSchema(...)
@@ -786,7 +850,7 @@ local function createObjClient<A..., B...>(info: NetworkInfo<A..., B...>): Netwo
 		
 		function Object:SetResponseTimeout(val: number): NetworkFunction<A..., B...>
 			if val > MAX_INVOKE_TIMEOUT or val < 0 then
-				warnMsg("Response timeout must be between 0 and "..MAX_INVOKE_TIMEOUT)
+				errorMsg(`Response timeout must be between 0 and {MAX_INVOKE_TIMEOUT}`)
 				return
 			end
 			info.ResponseTimeout = val
@@ -795,17 +859,17 @@ local function createObjClient<A..., B...>(info: NetworkInfo<A..., B...>): Netwo
 		return Object
 	end
 	
-	function Object.OnClientEvent:Connect(callback: (A...) -> ()): QuickNetConnection	
-		return getNetworkConnection(callbacks, callback)
+	function Object.OnClientEvent:Connect(callback: (A...) -> ()): Connection
+		return connect(signal, callback)
 	end
 	
-	function Object.OnClientEvent:ConnectAsync(callback: (A...) -> ()): QuickNetConnection	
-		return getNetworkConnection(asyncCallbacks, callback)
+	function Object.OnClientEvent:ConnectAsync(callback: (A...) -> ()): Connection
+		return connect(asyncSignal, callback)
 	end
 	
-	function Object.OnClientEvent:Once(callback: (player: Player, A...) -> ()): QuickNetConnection
+	function Object.OnClientEvent:Once(callback: (A...) -> ()): Connection
 		local conn
-		conn = self:ConnectAsync(function(...)
+		conn = connect(asyncSignal, function(...)
 			disconnect(conn)
 			callback(...)
 		end)
@@ -815,7 +879,7 @@ local function createObjClient<A..., B...>(info: NetworkInfo<A..., B...>): Netwo
 	function Object.OnClientEvent:Wait(): A...
 		local cor = coroutine.running()
 		local conn
-		conn = self:Connect(function(...)
+		conn = connect(signal, function(...)
 			disconnect(conn)
 			if coroutine.status(cor) == "suspended" then
 				coroutine.resume(cor, ...)
@@ -876,6 +940,7 @@ local function start()
 		internalRemote.OnClientEvent:Connect(remoteListenerClientPcall)
 		internalUnreliable.OnClientEvent:Connect(remoteListenerClientPcall)
 	end
+	print(`{SOURCE} QuickNet {VERSION} initialized!`)
 end
 
 --Public--
@@ -901,7 +966,11 @@ function QuickNet:addEnumItems(enums: {EnumItem})
 			id = enumFile:GetAttribute(key)
 			if id == nil then
 				enumFile:GetAttributeChangedSignal(key):Wait()
-				id = enumFile:GetAttribute(key) or 0
+				id = enumFile:GetAttribute(key)
+				if not id then
+					warnMsg(`Unable to get enum id for {name}`, true)
+					id = 0
+				end
 			end
 		end
 		if enumItems[id] ~= nil or enumItemsByEnum[enum] ~= nil then continue end
@@ -922,7 +991,7 @@ local myFunction = QuickNet:register("FunctionName", data.Color3):Response(data.
 ]]
 function QuickNet:register<A..., B...>(name: string, ...: A...): NetworkEvent<A...>
 	if namesRegistered[name] then
-		errorMsg(name.." already exists (names must be unique)")
+		errorMsg(`{name} already exists (names must be unique)`)
 		return
 	end
 	namesRegistered[name] = true
@@ -933,8 +1002,8 @@ function QuickNet:register<A..., B...>(name: string, ...: A...): NetworkEvent<A.
 	info.NetworkType = REMOTE_EVENT
 	info.RateLimit = {Max = RATE_LIMIT.Max, Time = RATE_LIMIT.Time}
 	info.SendSchema = getSchema(...)
-	info.Callbacks = {}
-	info.AsyncCallbacks = {}
+	info.Signal = {}
+	info.AsyncSignal = {}
 	info.ResponseTimeout = INVOKE_TIMEOUT
 	local object = createNetworkObject(info)
 	info.Object = object

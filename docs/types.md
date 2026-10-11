@@ -125,6 +125,12 @@ A PhysicalProperties object. The Density uses uint16, Friction uses uint8, Elast
 ## Rect (16 bytes)
 A Rect object. Each component of the min and max values are stored as float32s.
 
+## Font (~50 bytes)
+A font object. The exact size depends on the specific family as the whole content string is serialized.
+
+## Ray (24 bytes)
+A ray object. Each component is serialized as a float32.
+
 ## Any
 Any QuickNet data type. When using the Any type there is a 1 byte overhead to store the type tag.
 
@@ -198,6 +204,82 @@ QuickNet:register("MixedEvent", data.literal("Upgrade", 123, Vector3.new(1, 2, 3
     <div class="important-title">NOTE</div>
     <div class="important-content">
        Currently only numbers, strings, booleans, and Vector3 can be defined as literals. Also, the data used must match the values passed into data.literal exactly, or else QuickNet will throw an error.
+    </div>
+</div>
+
+## Custom
+A custom type is not really a type, but rather a hook for the user to define their own serialization logic. In cases where the data structure is complex (nested structures, mixed types, etc) a custom serializer can be significantly faster and more bandwidth efficient than the built in serializer.
+
+### `data.custom`
+This function can be called to hook a custom serializer for some arbitrary data type. The function expects 2 different functions as input, encode and decode, and optional metadata. It's highly recommended to tag these functions with `@native` as doing so can lead to a significant speedup of buffer operations.
+
+#### encode
+The encode function accepts as arguments a buffer, offset, the custom data, an instances array, and custom metadata, respectively. The provided offset is a snapshot of the current internal pointer of QuickNet. Any buffer operation in the encode function should advance the offset appropriately. The function must return the number of bytes written.
+
+#### decode
+The decode function accepts as arguments a buffer, offset, an instances array, and custom metadata, respectively. This function follows similar logic as the encode function. It should read from the provided buffer and decode the bytes into the appropriate data. This data should be returned along with the number of bytes read.
+
+#### metadata
+The 3rd argument of `data.custom` is any arbitrary metadata. This data is not serialized or used by QuickNet in any way and is meant to be used as a means to pass static data.
+
+```lua
+--[[
+intended data structure:
+{
+	{
+        id = data.NumberU8,
+        x = data.NumberU8,
+        y = data.NumberU8,
+        z = data.NumberU8,
+        orientation = data.NumberU8,
+        animation = data.NumberU8,
+	}
+}
+]]
+QuickNet:register("EntitiesTest", data.custom(
+	@native function(buff, offset, value, inst, metadata)
+		buffer.writeu8(buff, offset, #value)
+		local ptr = offset + 1
+        
+		for _, struct in value do
+			buffer.writeu8(buff, ptr, struct.id)
+			buffer.writeu8(buff, ptr + 1, struct.x)
+			buffer.writeu8(buff, ptr + 2, struct.y)
+			buffer.writeu8(buff, ptr + 3, struct.z)
+			buffer.writeu8(buff, ptr + 4, struct.orientation)
+			buffer.writeu8(buff, ptr + 5, struct.animation)
+			ptr += 6
+		end
+		return ptr - offset
+	end,
+    
+	@native function(buff, offset, inst, metadata)
+		local len = buffer.readu8(buff, offset)
+		local ptr = offset + 1
+		local array = table.create(len)
+        
+		for i = 1, len do
+			array[i] = {
+				id = buffer.readu8(buff, ptr),
+				x = buffer.readu8(buff, ptr + 1),
+				y = buffer.readu8(buff, ptr + 2),
+				z = buffer.readu8(buff, ptr + 3),
+				orientation = buffer.readu8(buff, ptr + 4),
+				animation = buffer.readu8(buff, ptr + 5),
+			}
+			ptr += 6
+		end
+		return array, ptr - offset
+	end,
+    
+	nil --no metadata needed
+	))
+```
+
+<div class="important-block">
+    <div class="important-title">NOTE</div>
+    <div class="important-content">
+       Performance improvement is not guaranteed and depends on the efficiency of the user's custom implementation as well as the specific data type. In addition, any small mistakes can cause other packets to be misaligned and crash the whole pipeline. Therefore, this feature should only be used by advanced users.
     </div>
 </div>
 
@@ -310,7 +392,7 @@ QuickNet:register("UniformDictEvent", {[data.String] = data.NumberU8})
 ### Dynamic Dictionary
 Use a dynamic dictionary when the keys and values can be any type and there can be any number of key-value pairs. Like dynamic arrays, dynamic dictionaries have a significant cost to CPU usage and network bandwidth for the same reasons as discussed for the former. The byte size of a dynamic dictionary is the total size of all the keys and values plus 2 bytes for the length plus 1 byte for each key and each value. To define a dynamic dictionary:
 ```lua
-QuickNet:register("DynamicDictEvent", {[data.Any] = data.Any}
+QuickNet:register("DynamicDictEvent", {[data.Any] = data.Any})
 ```
 
 ## Nested Arrays & Dictionaries
@@ -341,6 +423,7 @@ QuickNet can boost performance for eligible arrays and dictionaries via fast pat
 * NumberF32
 * String
 * Boolean
+* Static Dictionaries
 
 ## Limitations of Arrays and Dictionaries
 * *Static dictionaries currently can only have numbers or strings as keys
@@ -358,5 +441,6 @@ While QuickNet is highly optimized overall, it's not possible to achieve the sam
 * Avoid sending instances (send names or instance IDs instead)
 * Use NumberF32 over NumberF16 in most cases
 * Send Vector3s instead of CFrames if there is no rotation
+* Use custom serialization for complex data types
 
 Note: not following these guidelines will not suddenly lag or crash your game; QuickNet should still have better performance than default Remotes. These guidelines are for users who want the absolute maximum performance.

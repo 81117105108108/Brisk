@@ -103,13 +103,13 @@ export type Net_Dictionary_reliable_ServerApi = {
 }
 
 export type Net_RemoteFunction_function_RequestTuple = () -> { u8 }
-export type Net_RemoteFunction_function_ResponseTuple = () -> { boolean }
-export type Net_RemoteFunction_function_ClientCall = ({ u8 }) -> { boolean }
-export type Net_RemoteFunction_function_ServerCall = (Player, { u8 }) -> { boolean }
-export type Net_RemoteFunction_function_ClientHandler = ({ u8 }) -> { boolean }
-export type Net_RemoteFunction_function_ServerHandler = (Player, { u8 }) -> { boolean }
-export type Net_RemoteFunction_function_ClientFunctionCallback = (data: { u8 }) -> { boolean }
-export type Net_RemoteFunction_function_ServerFunctionCallback = (player: Player, data: { u8 }) -> { boolean }
+export type Net_RemoteFunction_function_ResponseTuple = () -> { u8 }
+export type Net_RemoteFunction_function_ClientCall = ({ u8 }) -> { u8 }
+export type Net_RemoteFunction_function_ServerCall = (Player, { u8 }) -> { u8 }
+export type Net_RemoteFunction_function_ClientHandler = ({ u8 }) -> { u8 }
+export type Net_RemoteFunction_function_ServerHandler = (Player, { u8 }) -> { u8 }
+export type Net_RemoteFunction_function_ClientFunctionCallback = (data: { u8 }) -> { u8 }
+export type Net_RemoteFunction_function_ServerFunctionCallback = (player: Player, data: { u8 }) -> { u8 }
 export type Net_RemoteFunction_function_ClientApi = {
     On: (Net_RemoteFunction_function_ClientFunctionCallback) -> Connection,
     Call: Net_RemoteFunction_function_ClientCall,

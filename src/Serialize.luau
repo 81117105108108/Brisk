@@ -8,11 +8,11 @@ local Enums = require(script.Parent.Enums)
 type SchemaArg = Types.SchemaArg
 type Literal = Types.Literal
 
-local FX8_SCALE = 10
-local FX8_ROT_SCALE = 40.42
-local FX16_SCALE = 100
-local FX16_ROT_SCALE = 10430
-local DYNAMIC_DEFAULTS = {
+const FX8_SCALE = 10
+const FX8_ROT_SCALE = 40.42
+const FX16_SCALE = 100
+const FX16_ROT_SCALE = 10430
+const DYNAMIC_DEFAULTS = {
 	number = Enums.NumberF64,
 	CFrame = Enums.CFrameF32,
 	Vector3 = Enums.Vector3F32,
@@ -35,36 +35,15 @@ local DYNAMIC_DEFAULTS = {
 	Region3 = Enums.Region3,
 	PhysicalProperties = Enums.PhysicalProperties,
 	Rect = Enums.Rect,
+	Font = Enums.Font,
+	Ray = Enums.Ray,
 }
-local ENUM_NIL = Enums.Nil
-local ENUM_ARRAYDYNAMIC = Enums.ArrayDynamic
+const ENUM_NIL = Enums.Nil
+const ENUM_ARRAYDYNAMIC = Enums.ArrayDynamic
+const TBL_POOL_SIZE = 100
 
-local TBL_POOL_SIZE = 100
 local tablePool = table.create(TBL_POOL_SIZE)
-
-local writeu8 = buffer.writeu8 
-local writeu16 = buffer.writeu16 
-local writeu32 = buffer.writeu32 
-local writei8 = buffer.writei8 
-local writei16 = buffer.writei16 
-local writei32 = buffer.writei32 
-local writef32 = buffer.writef32 
-local writef64 = buffer.writef64 
-local writestring = buffer.writestring 
-local readu8 = buffer.readu8 
-local readu16 = buffer.readu16 
-local readu32 = buffer.readu32 
-local readi8 = buffer.readi8 
-local readi16 = buffer.readi16 
-local readi32 = buffer.readi32 
-local readf32 = buffer.readf32 
-local readf64 = buffer.readf64 
-local readstring = buffer.readstring
-local stringLen = string.len
-local stringSub = string.sub
-local mathFrexp = math.frexp 
-local mathFloor = math.floor  
-
+ 
 @native local function getTable(): {any}
 	local poolIdx = #tablePool
 	local tbl = tablePool[poolIdx]
@@ -114,7 +93,7 @@ end
 		value = -value
 	end
 
-	local mantissa, exponent = mathFrexp(value)
+	local mantissa, exponent = math.frexp(value)
 	local expNum = exponent + 14
 	if expNum <= 0 then
 		return 0
@@ -122,7 +101,7 @@ end
 		return sign * 32768 + 31744
 	end
 	local mant = mantissa * 2048 - 1024
-	mant = mathFloor(mant + .5)
+	mant = math.floor(mant + .5)
 	return sign * 32768 + expNum * 1024 + mant
 end
 
@@ -136,7 +115,7 @@ end
 		value -= 0x8000
 	end
 
-	local exponent = mathFloor(value / 1024)
+	local exponent = math.floor(value / 1024)
 	local mantissa = value - exponent * 1024
 
 	if exponent == 0 then
@@ -151,144 +130,144 @@ end
 
 --number
 @native local function encodeNumberU8(buff: buffer, offset: number, arg: SchemaArg, value: number): number
-	writeu8(buff, offset, value)
+	buffer.writeu8(buff, offset, value)
 	return 1
 end
 
 @native local function encodeNumberU16(buff: buffer, offset: number, arg: SchemaArg, value: number): number
-	writeu16(buff, offset, value)
+	buffer.writeu16(buff, offset, value)
 	return 2
 end
 
 @native local function encodeNumberU32(buff: buffer, offset: number, arg: SchemaArg, value: number): number
-	writeu32(buff, offset, value)
+	buffer.writeu32(buff, offset, value)
 	return 4
 end
 
 @native local function encodeNumberI8(buff: buffer, offset: number, arg: SchemaArg, value: number): number
-	writei8(buff, offset, value)
+	buffer.writei8(buff, offset, value)
 	return 1
 end
 
 @native local function encodeNumberI16(buff: buffer, offset: number, arg: SchemaArg, value: number): number
-	writei16(buff, offset, value)
+	buffer.writei16(buff, offset, value)
 	return 2
 end
 
 @native local function encodeNumberI32(buff: buffer, offset: number, arg: SchemaArg, value: number): number
-	writei32(buff, offset, value)
+	buffer.writei32(buff, offset, value)
 	return 4
 end
 
 @native local function encodeNumberF16(buff: buffer, offset: number, arg: SchemaArg, value: number): number
-	writeu16(buff, offset, encodeFloat16(value))
+	buffer.writeu16(buff, offset, encodeFloat16(value))
 	return 2	
 end
 
 @native local function encodeNumberF32(buff: buffer, offset: number, arg: SchemaArg, value: number): number
-	writef32(buff, offset, value)
+	buffer.writef32(buff, offset, value)
 	return 4
 end
 
 @native local function encodeNumberF64(buff: buffer, offset: number, arg: SchemaArg, value: number): number
-	writef64(buff, offset, value)
+	buffer.writef64(buff, offset, value)
 	return 8
 end
 
 @native local function decodeNumberU8(buff: buffer, offset: number, arg: SchemaArg): (number, number)
-	return readu8(buff, offset), 1
+	return buffer.readu8(buff, offset), 1
 end
 
 @native local function decodeNumberU16(buff: buffer, offset: number, arg: SchemaArg): (number, number)
-	return readu16(buff, offset), 2
+	return buffer.readu16(buff, offset), 2
 end
 
 @native local function decodeNumberU32(buff: buffer, offset: number, arg: SchemaArg): (number, number)
-	return readu32(buff, offset), 4
+	return buffer.readu32(buff, offset), 4
 end
 
 @native local function decodeNumberI8(buff: buffer, offset: number, arg: SchemaArg): (number, number)
-	return readi8(buff, offset), 1
+	return buffer.readi8(buff, offset), 1
 end
 
 @native local function decodeNumberI16(buff: buffer, offset: number, arg: SchemaArg): (number, number)
-	return readi16(buff, offset), 2
+	return buffer.readi16(buff, offset), 2
 end
 
 @native local function decodeNumberI32(buff: buffer, offset: number, arg: SchemaArg): (number, number)
-	return readi32(buff, offset), 4
+	return buffer.readi32(buff, offset), 4
 end
 
 @native local function decodeNumberF16(buff: buffer, offset: number, arg: SchemaArg): (number, number)
-	return decodeFloat16(readu16(buff, offset)), 2
+	return decodeFloat16(buffer.readu16(buff, offset)), 2
 end
 
 @native local function decodeNumberF32(buff: buffer, offset: number, arg: SchemaArg): (number, number)
-	return readf32(buff, offset), 4
+	return buffer.readf32(buff, offset), 4
 end
 
 @native local function decodeNumberF64(buff: buffer, offset: number, arg: SchemaArg): (number, number)
-	return readf64(buff, offset), 8
+	return buffer.readf64(buff, offset), 8
 end
 
 --cframe
 @native local function encodeCFrameFX8(buff: buffer, offset: number, arg: SchemaArg, value: CFrame): number
 	local pos = value.Position
 	local x, y, z = value:ToEulerAnglesXYZ()
-	writei8(buff, offset, pos.X * FX8_SCALE)
-	writei8(buff, offset + 1, pos.Y * FX8_SCALE)
-	writei8(buff, offset + 2, pos.Z * FX8_SCALE)
-	writei8(buff, offset + 3, x * FX8_ROT_SCALE)
-	writei8(buff, offset + 4, y * FX8_ROT_SCALE)
-	writei8(buff, offset + 5, z * FX8_ROT_SCALE)
+	buffer.writei8(buff, offset, pos.X * FX8_SCALE)
+	buffer.writei8(buff, offset + 1, pos.Y * FX8_SCALE)
+	buffer.writei8(buff, offset + 2, pos.Z * FX8_SCALE)
+	buffer.writei8(buff, offset + 3, x * FX8_ROT_SCALE)
+	buffer.writei8(buff, offset + 4, y * FX8_ROT_SCALE)
+	buffer.writei8(buff, offset + 5, z * FX8_ROT_SCALE)
 	return 6
 end
 
 @native local function encodeCFrameI16FX16(buff: buffer, offset: number, arg: SchemaArg, value: CFrame): number
 	local pos = value.Position
 	local x, y, z = value:ToEulerAnglesXYZ()
-	writei16(buff, offset, pos.X)
-	writei16(buff, offset + 2, pos.Y)
-	writei16(buff, offset + 4, pos.Z)
-	writei16(buff, offset + 6, x * FX16_ROT_SCALE)
-	writei16(buff, offset + 8, y * FX16_ROT_SCALE)
-	writei16(buff, offset + 10, z * FX16_ROT_SCALE)
+	buffer.writei16(buff, offset, pos.X)
+	buffer.writei16(buff, offset + 2, pos.Y)
+	buffer.writei16(buff, offset + 4, pos.Z)
+	buffer.writei16(buff, offset + 6, x * FX16_ROT_SCALE)
+	buffer.writei16(buff, offset + 8, y * FX16_ROT_SCALE)
+	buffer.writei16(buff, offset + 10, z * FX16_ROT_SCALE)
 	return 12
 end
 
 @native local function decodeCFrameI16FX16(buff: buffer, offset: number, arg: SchemaArg): (CFrame, number)
 	local pos = Vector3.new(
-		readi16(buff, offset),
-		readi16(buff, offset + 2),
-		readi16(buff, offset + 4)
+		buffer.readi16(buff, offset),
+		buffer.readi16(buff, offset + 2),
+		buffer.readi16(buff, offset + 4)
 	)
-	local x = readi16(buff, offset + 6) / FX16_ROT_SCALE
-	local y = readi16(buff, offset + 8) / FX16_ROT_SCALE
-	local z = readi16(buff, offset + 10) / FX16_ROT_SCALE
+	local x = buffer.readi16(buff, offset + 6) / FX16_ROT_SCALE
+	local y = buffer.readi16(buff, offset + 8) / FX16_ROT_SCALE
+	local z = buffer.readi16(buff, offset + 10) / FX16_ROT_SCALE
 	return CFrame.Angles(x, y, z) + pos, 12
 end
 
 @native local function encodeCFrameFX16(buff: buffer, offset: number, arg: SchemaArg, value: CFrame): number
 	local pos = value.Position
 	local x, y, z = value:ToEulerAnglesXYZ()
-	writei16(buff, offset, pos.X * FX16_SCALE)
-	writei16(buff, offset + 2, pos.Y * FX16_SCALE)
-	writei16(buff, offset + 4, pos.Z * FX16_SCALE)
-	writei16(buff, offset + 6, x * FX16_ROT_SCALE)
-	writei16(buff, offset + 8, y * FX16_ROT_SCALE)
-	writei16(buff, offset + 10, z * FX16_ROT_SCALE)
+	buffer.writei16(buff, offset, pos.X * FX16_SCALE)
+	buffer.writei16(buff, offset + 2, pos.Y * FX16_SCALE)
+	buffer.writei16(buff, offset + 4, pos.Z * FX16_SCALE)
+	buffer.writei16(buff, offset + 6, x * FX16_ROT_SCALE)
+	buffer.writei16(buff, offset + 8, y * FX16_ROT_SCALE)
+	buffer.writei16(buff, offset + 10, z * FX16_ROT_SCALE)
 	return 12
 end
 
 @native local function encodeCFrameF16(buff: buffer, offset: number, arg: SchemaArg, value: CFrame): number
 	local pos = value.Position
 	local x, y, z = value:ToEulerAnglesXYZ()
-	writeu16(buff, offset, encodeFloat16(pos.X))
-	writeu16(buff, offset + 2, encodeFloat16(pos.Y))
-	writeu16(buff, offset + 4, encodeFloat16(pos.Z))
-	writeu16(buff, offset + 6, encodeFloat16(x))
-	writeu16(buff, offset + 8, encodeFloat16(y))
-	writeu16(buff, offset + 10, encodeFloat16(z))
+	buffer.writeu16(buff, offset, encodeFloat16(pos.X))
+	buffer.writeu16(buff, offset + 2, encodeFloat16(pos.Y))
+	buffer.writeu16(buff, offset + 4, encodeFloat16(pos.Z))
+	buffer.writeu16(buff, offset + 6, encodeFloat16(x))
+	buffer.writeu16(buff, offset + 8, encodeFloat16(y))
+	buffer.writeu16(buff, offset + 10, encodeFloat16(z))
 	return 12
 end
 
@@ -361,282 +340,282 @@ local alignIdsToCFrames = {
 	r20, r21, r22 = value:GetComponents()
 	local right = axisId(r00, r10, r20)
 	local up = axisId(r01, r11, r21)
-	writef32(buff, offset, x)
-	writef32(buff, offset + 4, y)
-	writef32(buff, offset + 8, z)
-	writeu8(buff, offset + 12, right * 6 + up)
+	buffer.writef32(buff, offset, x)
+	buffer.writef32(buff, offset + 4, y)
+	buffer.writef32(buff, offset + 8, z)
+	buffer.writeu8(buff, offset + 12, right * 6 + up)
 	return 13
 end
 
 @native local function decodeCFrameF32Aligned(buff: buffer, offset: number, arg: SchemaArg): (CFrame, number)
-	local x = readf32(buff, offset)
-	local y = readf32(buff, offset + 4)
-	local z = readf32(buff, offset + 8)
-	local alignId = readu8(buff, offset + 12)
+	local x = buffer.readf32(buff, offset)
+	local y = buffer.readf32(buff, offset + 4)
+	local z = buffer.readf32(buff, offset + 8)
+	local alignId = buffer.readu8(buff, offset + 12)
 	return alignIdsToCFrames[alignId] + Vector3.new(x, y, z), 13
 end
 
 @native local function encodeCFrameF32FX16(buff: buffer, offset: number, arg: SchemaArg, value: CFrame): number
 	local pos = value.Position
 	local x, y, z = value:ToEulerAnglesXYZ()
-	writef32(buff, offset, pos.X)
-	writef32(buff, offset + 4, pos.Y)
-	writef32(buff, offset + 8, pos.Z)
-	writei16(buff, offset + 12, x * FX16_ROT_SCALE)
-	writei16(buff, offset + 14, y * FX16_ROT_SCALE)
-	writei16(buff, offset + 16, z * FX16_ROT_SCALE)
+	buffer.writef32(buff, offset, pos.X)
+	buffer.writef32(buff, offset + 4, pos.Y)
+	buffer.writef32(buff, offset + 8, pos.Z)
+	buffer.writei16(buff, offset + 12, x * FX16_ROT_SCALE)
+	buffer.writei16(buff, offset + 14, y * FX16_ROT_SCALE)
+	buffer.writei16(buff, offset + 16, z * FX16_ROT_SCALE)
 	return 18
 end
 
 @native local function encodeCFrameF32(buff: buffer, offset: number, arg: SchemaArg, value: CFrame): number
 	local pos = value.Position
 	local x, y, z = value:ToEulerAnglesXYZ()
-	writef32(buff, offset, pos.X)
-	writef32(buff, offset + 4, pos.Y)
-	writef32(buff, offset + 8, pos.Z)
-	writef32(buff, offset + 12, x)
-	writef32(buff, offset + 16, y)
-	writef32(buff, offset + 20, z)
+	buffer.writef32(buff, offset, pos.X)
+	buffer.writef32(buff, offset + 4, pos.Y)
+	buffer.writef32(buff, offset + 8, pos.Z)
+	buffer.writef32(buff, offset + 12, x)
+	buffer.writef32(buff, offset + 16, y)
+	buffer.writef32(buff, offset + 20, z)
 	return 24
 end
 
 @native local function decodeCFrameFX8(buff: buffer, offset: number, arg: SchemaArg): (CFrame, number)
-	local posX = readi8(buff, offset) / FX8_SCALE
-	local posY = readi8(buff, offset + 1) / FX8_SCALE
-	local posZ = readi8(buff, offset + 2) / FX8_SCALE
-	local x = readi8(buff, offset + 3) / FX8_ROT_SCALE
-	local y = readi8(buff, offset + 4) / FX8_ROT_SCALE
-	local z = readi8(buff, offset + 5) / FX8_ROT_SCALE
+	local posX = buffer.readi8(buff, offset) / FX8_SCALE
+	local posY = buffer.readi8(buff, offset + 1) / FX8_SCALE
+	local posZ = buffer.readi8(buff, offset + 2) / FX8_SCALE
+	local x = buffer.readi8(buff, offset + 3) / FX8_ROT_SCALE
+	local y = buffer.readi8(buff, offset + 4) / FX8_ROT_SCALE
+	local z = buffer.readi8(buff, offset + 5) / FX8_ROT_SCALE
 	return CFrame.Angles(x, y, z) + Vector3.new(posX, posY, posZ), 6
 end
 
 @native local function decodeCFrameFX16(buff: buffer, offset: number, arg: SchemaArg): (CFrame, number)
-	local posX = readi16(buff, offset) / FX16_SCALE
-	local posY = readi16(buff, offset + 2) / FX16_SCALE
-	local posZ = readi16(buff, offset + 4) / FX16_SCALE
-	local x = readi16(buff, offset + 6) / FX16_ROT_SCALE
-	local y = readi16(buff, offset + 8) / FX16_ROT_SCALE
-	local z = readi16(buff, offset + 10) / FX16_ROT_SCALE
+	local posX = buffer.readi16(buff, offset) / FX16_SCALE
+	local posY = buffer.readi16(buff, offset + 2) / FX16_SCALE
+	local posZ = buffer.readi16(buff, offset + 4) / FX16_SCALE
+	local x = buffer.readi16(buff, offset + 6) / FX16_ROT_SCALE
+	local y = buffer.readi16(buff, offset + 8) / FX16_ROT_SCALE
+	local z = buffer.readi16(buff, offset + 10) / FX16_ROT_SCALE
 	return CFrame.Angles(x, y, z) + Vector3.new(posX, posY, posZ), 12
 end
 
 @native local function decodeCFrameF16(buff: buffer, offset: number, arg: SchemaArg): (CFrame, number)
-	local posX = decodeFloat16(readu16(buff, offset))
-	local posY = decodeFloat16(readu16(buff, offset + 2))
-	local posZ = decodeFloat16(readu16(buff, offset + 4))
-	local x = decodeFloat16(readu16(buff, offset + 6))
-	local y = decodeFloat16(readu16(buff, offset + 8))
-	local z = decodeFloat16(readu16(buff, offset + 10))
+	local posX = decodeFloat16(buffer.readu16(buff, offset))
+	local posY = decodeFloat16(buffer.readu16(buff, offset + 2))
+	local posZ = decodeFloat16(buffer.readu16(buff, offset + 4))
+	local x = decodeFloat16(buffer.readu16(buff, offset + 6))
+	local y = decodeFloat16(buffer.readu16(buff, offset + 8))
+	local z = decodeFloat16(buffer.readu16(buff, offset + 10))
 	return CFrame.Angles(x, y, z) + Vector3.new(posX, posY, posZ), 12
 end
 
 @native local function decodeCFrameF32FX16(buff: buffer, offset: number, arg: SchemaArg): (CFrame, number)
-	local posX = readf32(buff, offset)
-	local posY = readf32(buff, offset + 4)
-	local posZ = readf32(buff, offset + 8)
-	local x = readi16(buff, offset + 12) / FX16_ROT_SCALE
-	local y = readi16(buff, offset + 14) / FX16_ROT_SCALE
-	local z = readi16(buff, offset + 16) / FX16_ROT_SCALE
+	local posX = buffer.readf32(buff, offset)
+	local posY = buffer.readf32(buff, offset + 4)
+	local posZ = buffer.readf32(buff, offset + 8)
+	local x = buffer.readi16(buff, offset + 12) / FX16_ROT_SCALE
+	local y = buffer.readi16(buff, offset + 14) / FX16_ROT_SCALE
+	local z = buffer.readi16(buff, offset + 16) / FX16_ROT_SCALE
 	return CFrame.Angles(x, y, z) + Vector3.new(posX, posY, posZ), 18
 end
 
 @native local function decodeCFrameF32(buff: buffer, offset: number, arg: SchemaArg): (CFrame, number)
-	local posX = readf32(buff, offset)
-	local posY = readf32(buff, offset + 4)
-	local posZ = readf32(buff, offset + 8)
-	local x = readf32(buff, offset + 12)
-	local y = readf32(buff, offset + 16)
-	local z = readf32(buff, offset + 20)
+	local posX = buffer.readf32(buff, offset)
+	local posY = buffer.readf32(buff, offset + 4)
+	local posZ = buffer.readf32(buff, offset + 8)
+	local x = buffer.readf32(buff, offset + 12)
+	local y = buffer.readf32(buff, offset + 16)
+	local z = buffer.readf32(buff, offset + 20)
 	return CFrame.Angles(x, y, z) + Vector3.new(posX, posY, posZ), 24
 end
 
 --vector3
 @native local function encodeVector3FX8(buff: buffer, offset: number, arg: SchemaArg, value: Vector3): number
-	writei8(buff, offset, value.X * FX8_SCALE)
-	writei8(buff, offset + 1, value.Y * FX8_SCALE)
-	writei8(buff, offset + 2, value.Z * FX8_SCALE)
+	buffer.writei8(buff, offset, value.X * FX8_SCALE)
+	buffer.writei8(buff, offset + 1, value.Y * FX8_SCALE)
+	buffer.writei8(buff, offset + 2, value.Z * FX8_SCALE)
 	return 3
 end
 
 @native local function encodeVector3I16(buff: buffer, offset: number, arg: SchemaArg, value: Vector3): number
-	writei16(buff, offset, value.X)
-	writei16(buff, offset + 2, value.Y)
-	writei16(buff, offset + 4, value.Z)
+	buffer.writei16(buff, offset, value.X)
+	buffer.writei16(buff, offset + 2, value.Y)
+	buffer.writei16(buff, offset + 4, value.Z)
 	return 6
 end
 
 @native local function decodeVector3I16(buff: buffer, offset: number, arg: SchemaArg): (Vector3, number)
 	return Vector3.new(
-		readi16(buff, offset),
-		readi16(buff, offset + 2),
-		readi16(buff, offset + 4)
+		buffer.readi16(buff, offset),
+		buffer.readi16(buff, offset + 2),
+		buffer.readi16(buff, offset + 4)
 	), 6
 end
 
 @native local function encodeVector3FX16(buff: buffer, offset: number, arg: SchemaArg, value: Vector3): number
-	writei16(buff, offset, value.X * FX16_SCALE)
-	writei16(buff, offset + 2, value.Y * FX16_SCALE)
-	writei16(buff, offset + 4, value.Z * FX16_SCALE)
+	buffer.writei16(buff, offset, value.X * FX16_SCALE)
+	buffer.writei16(buff, offset + 2, value.Y * FX16_SCALE)
+	buffer.writei16(buff, offset + 4, value.Z * FX16_SCALE)
 	return 6
 end
 
 @native local function encodeVector3F16(buff: buffer, offset: number, arg: SchemaArg, value: Vector3): number	
-	writeu16(buff, offset, encodeFloat16(value.X))
-	writeu16(buff, offset + 2, encodeFloat16(value.Y))
-	writeu16(buff, offset + 4, encodeFloat16(value.Z))
+	buffer.writeu16(buff, offset, encodeFloat16(value.X))
+	buffer.writeu16(buff, offset + 2, encodeFloat16(value.Y))
+	buffer.writeu16(buff, offset + 4, encodeFloat16(value.Z))
 	return 6
 end
 
 @native local function encodeVector3F32(buff: buffer, offset: number, arg: SchemaArg, value: Vector3): number
-	writef32(buff, offset, value.X)
-	writef32(buff, offset + 4, value.Y)
-	writef32(buff, offset + 8, value.Z)
+	buffer.writef32(buff, offset, value.X)
+	buffer.writef32(buff, offset + 4, value.Y)
+	buffer.writef32(buff, offset + 8, value.Z)
 	return 12
 end
 
 @native local function decodeVector3FX8(buff: buffer, offset: number, arg: SchemaArg): (Vector3, number)
-	local x = readi8(buff, offset) / FX8_SCALE
-	local y = readi8(buff, offset + 1) / FX8_SCALE
-	local z = readi8(buff, offset + 2) / FX8_SCALE
+	local x = buffer.readi8(buff, offset) / FX8_SCALE
+	local y = buffer.readi8(buff, offset + 1) / FX8_SCALE
+	local z = buffer.readi8(buff, offset + 2) / FX8_SCALE
 	return Vector3.new(x, y, z), 3
 end
 
 @native local function decodeVector3FX16(buff: buffer, offset: number, arg: SchemaArg): (Vector3, number)
-	local x = readi16(buff, offset) / FX16_SCALE
-	local y = readi16(buff, offset + 2) / FX16_SCALE
-	local z = readi16(buff, offset + 4) / FX16_SCALE
+	local x = buffer.readi16(buff, offset) / FX16_SCALE
+	local y = buffer.readi16(buff, offset + 2) / FX16_SCALE
+	local z = buffer.readi16(buff, offset + 4) / FX16_SCALE
 	return Vector3.new(x, y, z), 6
 end
 
 @native local function decodeVector3F16(buff: buffer, offset: number, arg: SchemaArg): (Vector3, number)
-	local x = decodeFloat16(readu16(buff, offset))
-	local y = decodeFloat16(readu16(buff, offset + 2))
-	local z = decodeFloat16(readu16(buff, offset + 4))
+	local x = decodeFloat16(buffer.readu16(buff, offset))
+	local y = decodeFloat16(buffer.readu16(buff, offset + 2))
+	local z = decodeFloat16(buffer.readu16(buff, offset + 4))
 	return Vector3.new(x, y, z), 6
 end
 
 @native local function decodeVector3F32(buff: buffer, offset: number, arg: SchemaArg): (Vector3, number)
 	return Vector3.new(
-		readf32(buff, offset),
-		readf32(buff, offset + 4),
-		readf32(buff, offset + 8)
+		buffer.readf32(buff, offset),
+		buffer.readf32(buff, offset + 4),
+		buffer.readf32(buff, offset + 8)
 	), 12
 end
 
 --vector2
 @native local function encodeVector2FX8(buff: buffer, offset: number, arg: SchemaArg, value: Vector2): number
-	writei8(buff, offset, value.X * FX8_SCALE)
-	writei8(buff, offset + 1, value.Y * FX8_SCALE)
+	buffer.writei8(buff, offset, value.X * FX8_SCALE)
+	buffer.writei8(buff, offset + 1, value.Y * FX8_SCALE)
 	return 2
 end
 
 @native local function encodeVector2I16(buff: buffer, offset: number, arg: SchemaArg, value: Vector2): number
-	writei16(buff, offset, value.X)
-	writei16(buff, offset + 2, value.Y)
+	buffer.writei16(buff, offset, value.X)
+	buffer.writei16(buff, offset + 2, value.Y)
 	return 4
 end
 
 @native local function decodeVector2I16(buff: buffer, offset: number, arg: SchemaArg): (Vector2, number)
-	return Vector2.new(readi16(buff, offset), readi16(buff, offset + 2)), 4
+	return Vector2.new(buffer.readi16(buff, offset), buffer.readi16(buff, offset + 2)), 4
 end
 
 @native local function encodeVector2FX16(buff: buffer, offset: number, arg: SchemaArg, value: Vector2): number
-	writei16(buff, offset, value.X * FX16_SCALE)
-	writei16(buff, offset + 2, value.Y * FX16_SCALE)
+	buffer.writei16(buff, offset, value.X * FX16_SCALE)
+	buffer.writei16(buff, offset + 2, value.Y * FX16_SCALE)
 	return 4
 end
 
 @native local function encodeVector2F16(buff: buffer, offset: number, arg: SchemaArg, value: Vector2): number
-	writeu16(buff, offset, encodeFloat16(value.X))
-	writeu16(buff, offset + 2, encodeFloat16(value.Y))
+	buffer.writeu16(buff, offset, encodeFloat16(value.X))
+	buffer.writeu16(buff, offset + 2, encodeFloat16(value.Y))
 	return 4
 end
 
 @native local function encodeVector2F32(buff: buffer, offset: number, arg: SchemaArg, value: Vector2): number
-	writef32(buff, offset, value.X)
-	writef32(buff, offset + 4, value.Y)
+	buffer.writef32(buff, offset, value.X)
+	buffer.writef32(buff, offset + 4, value.Y)
 	return 8
 end
 
 @native local function decodeVector2FX8(buff: buffer, offset: number, arg: SchemaArg): (Vector2, number)
-	local x = readi8(buff, offset) / FX8_SCALE
-	local y = readi8(buff, offset + 1) / FX8_SCALE
+	local x = buffer.readi8(buff, offset) / FX8_SCALE
+	local y = buffer.readi8(buff, offset + 1) / FX8_SCALE
 	return Vector2.new(x, y), 2
 end
 
 @native local function decodeVector2FX16(buff: buffer, offset: number, arg: SchemaArg): (Vector2, number)
-	local x = readi16(buff, offset) / FX16_SCALE
-	local y = readi16(buff, offset + 2) / FX16_SCALE
+	local x = buffer.readi16(buff, offset) / FX16_SCALE
+	local y = buffer.readi16(buff, offset + 2) / FX16_SCALE
 	return Vector2.new(x, y), 4
 end
 
 @native local function decodeVector2F16(buff: buffer, offset: number, arg: SchemaArg): (Vector2, number)
-	local x = decodeFloat16(readu16(buff, offset))
-	local y = decodeFloat16(readu16(buff, offset + 2))
+	local x = decodeFloat16(buffer.readu16(buff, offset))
+	local y = decodeFloat16(buffer.readu16(buff, offset + 2))
 	return Vector2.new(x, y), 4
 end
 
 @native local function decodeVector2F32(buff: buffer, offset: number, arg: SchemaArg): (Vector2, number)
-	local x = readf32(buff, offset)
-	local y = readf32(buff, offset + 4)
+	local x = buffer.readf32(buff, offset)
+	local y = buffer.readf32(buff, offset + 4)
 	return Vector2.new(x, y), 8
 end
 
 --misc
 @native local function encodeString(buff: buffer, offset: number, arg: SchemaArg, value: string): number
-	local bytes = stringLen(value)
-	writeu8(buff, offset, bytes)
-	writestring(buff, offset + 1, value, bytes)
+	local bytes = string.len(value)
+	buffer.writeu8(buff, offset, bytes)
+	buffer.writestring(buff, offset + 1, value, bytes)
 	return bytes + 1
 end
 
 @native local function decodeString(buff: buffer, offset: number, arg: SchemaArg): (string, number)
-	local bytes = readu8(buff, offset)
-	return readstring(buff, offset + 1, bytes), bytes + 1
+	local bytes = buffer.readu8(buff, offset)
+	return buffer.readstring(buff, offset + 1, bytes), bytes + 1
 end
 
 @native local function encodeStringLong(buff: buffer, offset: number, arg: SchemaArg, value: string): number
-	local bytes = stringLen(value)
-	writeu32(buff, offset, bytes)
-	writestring(buff, offset + 4, value, bytes)
+	local bytes = string.len(value)
+	buffer.writeu32(buff, offset, bytes)
+	buffer.writestring(buff, offset + 4, value, bytes)
 	return bytes + 4
 end
 
 @native local function decodeStringLong(buff: buffer, offset: number, arg: SchemaArg, value: string): (string, number)
-	local bytes = readu32(buff, offset)
-	return readstring(buff, offset + 4, bytes), bytes + 4
+	local bytes = buffer.readu32(buff, offset)
+	return buffer.readstring(buff, offset + 4, bytes), bytes + 4
 end
 
 @native local function encodeColor(buff: buffer, offset: number, arg: SchemaArg, value: Color3): number
-	writeu8(buff, offset, value.R * 255 + .5)
-	writeu8(buff, offset + 1, value.G * 255 + .5)
-	writeu8(buff, offset + 2, value.B * 255 + .5)
+	buffer.writeu8(buff, offset, value.R * 255 + .5)
+	buffer.writeu8(buff, offset + 1, value.G * 255 + .5)
+	buffer.writeu8(buff, offset + 2, value.B * 255 + .5)
 	return 3
 end
 
 @native local function decodeColor(buff: buffer, offset: number, arg: SchemaArg): (Color3, number)
-	local r = readu8(buff, offset)
-	local g = readu8(buff, offset + 1)
-	local b = readu8(buff, offset + 2)
+	local r = buffer.readu8(buff, offset)
+	local g = buffer.readu8(buff, offset + 1)
+	local b = buffer.readu8(buff, offset + 2)
 	return Color3.fromRGB(r, g, b), 3
 end
 
 @native local function encodeBrickColor(buff: buffer, offset: number, arg: SchemaArg, value: BrickColor): number
-	writeu16(buff, offset, value.Number)
+	buffer.writeu16(buff, offset, value.Number)
 	return 2
 end
 
 @native local function decodeBrickColor(buff: buffer, offset: number, arg: SchemaArg): (BrickColor, number)
-	return BrickColor.new(readu16(buff, offset)), 2
+	return BrickColor.new(buffer.readu16(buff, offset)), 2
 end
 
 @native local function encodeBool(buff: buffer, offset: number, arg: SchemaArg, value: boolean): number
-	writeu8(buff, offset, value and 1 or 0)
+	buffer.writeu8(buff, offset, if value then 1 else 0)
 	return 1
 end
 
 @native local function decodeBool(buff: buffer, offset: number, arg: SchemaArg): (boolean, number)
-	local val = readu8(buff, offset)
+	local val = buffer.readu8(buff, offset)
 	return val == 1, 1
 end
 
@@ -650,34 +629,34 @@ end
 
 @native local function encodeBuffer(buff: buffer, offset: number, arg: SchemaArg, value: buffer): number
 	local len = buffer.len(value)
-	writeu16(buff, offset, len)
+	buffer.writeu16(buff, offset, len)
 	buffer.copy(buff, offset + 2, value, 0, len)
 	return len + 2
 end
 
 @native local function decodeBuffer(buff: buffer, offset: number, arg: SchemaArg): (buffer?, number)
-	local len = readu16(buff, offset)
+	local len = buffer.readu16(buff, offset)
 	local newBuff = buffer.create(len)
 	buffer.copy(newBuff, 0, buff, offset + 2, len)
 	return newBuff, len + 2
 end
 
 @native local function encodeDateTime32(buff: buffer, offset: number, arg: SchemaArg, value: DateTime): number
-	writeu32(buff, offset, value.UnixTimestamp)
+	buffer.writeu32(buff, offset, value.UnixTimestamp)
 	return 4
 end
 
 @native local function decodeDateTime32(buff: buffer, offset: number, arg: SchemaArg): (DateTime, number)
-	return DateTime.fromUnixTimestamp(readu32(buff, offset)), 4
+	return DateTime.fromUnixTimestamp(buffer.readu32(buff, offset)), 4
 end
 
 @native local function encodeDateTime64(buff: buffer, offset: number, arg: SchemaArg, value: DateTime): number
-	writef64(buff, offset, value.UnixTimestampMillis)
+	buffer.writef64(buff, offset, value.UnixTimestampMillis)
 	return 8
 end
 
 @native local function decodeDateTime64(buff: buffer, offset: number, arg: SchemaArg): (DateTime, number)
-	return DateTime.fromUnixTimestampMillis(readf64(buff, offset)), 8
+	return DateTime.fromUnixTimestampMillis(buffer.readf64(buff, offset)), 8
 end
 
 local tweenStyles = {
@@ -717,18 +696,18 @@ local tweenDirectionsToId: {[EnumItem]: number} = keyValueSwap(tweenDirections)
 	local reverse = value.Reverses and 1 or 0
 	local packed = style + dir * 16 + reverse * 128
 	
-	writeu16(buff, offset, value.Time * FX16_SCALE)
-	writeu8(buff, offset + 2, packed)
-	writei8(buff, offset + 3, value.RepeatCount)
-	writeu16(buff, offset + 4, value.DelayTime * FX16_SCALE)
+	buffer.writeu16(buff, offset, value.Time * FX16_SCALE)
+	buffer.writeu8(buff, offset + 2, packed)
+	buffer.writei8(buff, offset + 3, value.RepeatCount)
+	buffer.writeu16(buff, offset + 4, value.DelayTime * FX16_SCALE)
 	return 6
 end
 
 @native local function decodeTweenInfo(buff: buffer, offset: number, arg: SchemaArg): (TweenInfo, number)
-	local tweenTime = readu16(buff, offset) / FX16_SCALE
-	local packed = readu8(buff, offset + 2)
-	local repeatCount = readi8(buff, offset + 3)
-	local delayTime = readu16(buff, offset + 4) / FX16_SCALE
+	local tweenTime = buffer.readu16(buff, offset) / FX16_SCALE
+	local packed = buffer.readu8(buff, offset + 2)
+	local repeatCount = buffer.readi8(buff, offset + 3)
+	local delayTime = buffer.readu16(buff, offset + 4) / FX16_SCALE
 	
 	local styleId = packed % 16
 	local dirId = (packed // 16) % 8
@@ -748,32 +727,32 @@ end
 @native local function encodeColorSequence(buff: buffer, offset: number, arg: SchemaArg, value: ColorSequence)
 	:number
 	local keypoints = value.Keypoints
-	writeu8(buff, offset, #keypoints)
+	buffer.writeu8(buff, offset, #keypoints)
 	local ptr = offset + 1
 	
 	for _, kp in keypoints do
 		local color = kp.Value
-		writeu8(buff, ptr, kp.Time * 255 + .5)
-		writeu8(buff, ptr + 1, color.R * 255 + .5)
-		writeu8(buff, ptr + 2, color.G * 255 + .5)
-		writeu8(buff, ptr + 3, color.B * 255 + .5)
+		buffer.writeu8(buff, ptr, kp.Time * 255 + .5)
+		buffer.writeu8(buff, ptr + 1, color.R * 255 + .5)
+		buffer.writeu8(buff, ptr + 2, color.G * 255 + .5)
+		buffer.writeu8(buff, ptr + 3, color.B * 255 + .5)
 		ptr += 4
 	end	
 	return ptr - offset
 end
 
 @native local function decodeColorSequence(buff: buffer, offset: number, arg: SchemaArg): (ColorSequence, number)
-	local len = readu8(buff, offset)
+	local len = buffer.readu8(buff, offset)
 	local ptr = offset + 1
 	local keypoints = table.create(len)
 	
 	for i = 1, len do
 		keypoints[i] = ColorSequenceKeypoint.new(
-			readu8(buff, ptr) / 255,
+			buffer.readu8(buff, ptr) / 255,
 			Color3.fromRGB(
-				readu8(buff, ptr + 1),
-				readu8(buff, ptr + 2),
-				readu8(buff, ptr + 3)
+				buffer.readu8(buff, ptr + 1),
+				buffer.readu8(buff, ptr + 2),
+				buffer.readu8(buff, ptr + 3)
 			)
 		)
 		ptr += 4
@@ -784,13 +763,13 @@ end
 @native local function encodeNumberSequence(buff: buffer, offset: number, arg: SchemaArg, value: NumberSequence)
 	:number
 	local keypoints = value.Keypoints
-	writeu8(buff, offset, #keypoints)
+	buffer.writeu8(buff, offset, #keypoints)
 	local ptr = offset + 1
 	
 	for _, kp in keypoints do
-		writeu8(buff, ptr, kp.Time * 255 + .5)
-		writeu8(buff, ptr + 1, kp.Value * 255 + .5)
-		writeu8(buff, ptr + 2, kp.Envelope * 255 + .5)
+		buffer.writeu8(buff, ptr, kp.Time * 255 + .5)
+		buffer.writeu8(buff, ptr + 1, kp.Value * 255 + .5)
+		buffer.writeu8(buff, ptr + 2, kp.Envelope * 255 + .5)
 		ptr += 3
 	end
 	return ptr - offset
@@ -798,15 +777,15 @@ end
 
 @native local function decodeNumberSequence(buff: buffer, offset: number, arg: SchemaArg)
 	: (NumberSequence, number)
-	local len = readu8(buff, offset)
+	local len = buffer.readu8(buff, offset)
 	local ptr = offset + 1
 	local keypoints = table.create(len)
 	
 	for i = 1, len do
 		keypoints[i] = NumberSequenceKeypoint.new(
-			readu8(buff, ptr) / 255,
-			readu8(buff, ptr + 1) / 255,
-			readu8(buff, ptr + 2) / 255
+			buffer.readu8(buff, ptr) / 255,
+			buffer.readu8(buff, ptr + 1) / 255,
+			buffer.readu8(buff, ptr + 2) / 255
 		)
 		ptr += 3
 	end
@@ -815,40 +794,40 @@ end
 
 @native local function encodeNumberRange(buff: buffer, offset: number, arg: SchemaArg, value: NumberRange)
 	:number
-	writef32(buff, offset, value.Min)
-	writef32(buff, offset + 4, value.Max)
+	buffer.writef32(buff, offset, value.Min)
+	buffer.writef32(buff, offset + 4, value.Max)
 	return 8
 end
 
 @native local function decodeNumberRange(buff: buffer, offset: number, arg: SchemaArg): (NumberRange, number)
-	return NumberRange.new(readf32(buff, offset), readf32(buff, offset + 4)), 8
+	return NumberRange.new(buffer.readf32(buff, offset), buffer.readf32(buff, offset + 4)), 8
 end
 
 @native local function encodeUDim(buff: buffer, offset: number, arg: SchemaArg, value: UDim): number
-	writei16(buff, offset, value.Scale * 1000)
-	writei16(buff, offset + 2, value.Offset)
+	buffer.writei16(buff, offset, value.Scale * 1000)
+	buffer.writei16(buff, offset + 2, value.Offset)
 	return 4
 end
 
 @native local function decodeUDim(buff: buffer, offset: number, arg: SchemaArg): (UDim, number)
-	return UDim.new(readi16(buff, offset) / 1000, readi16(buff, offset + 2)), 4
+	return UDim.new(buffer.readi16(buff, offset) / 1000, buffer.readi16(buff, offset + 2)), 4
 end
 
 @native local function encodeUDim2(buff: buffer, offset: number, arg: SchemaArg, value: UDim2): number
 	local x, y = value.X, value.Y
-	writei16(buff, offset, x.Scale * 1000)
-	writei16(buff, offset + 2, x.Offset)
-	writei16(buff, offset + 4, y.Scale * 1000)
-	writei16(buff, offset + 6, y.Offset)
+	buffer.writei16(buff, offset, x.Scale * 1000)
+	buffer.writei16(buff, offset + 2, x.Offset)
+	buffer.writei16(buff, offset + 4, y.Scale * 1000)
+	buffer.writei16(buff, offset + 6, y.Offset)
 	return 8
 end
 
 @native local function decodeUDim2(buff: buffer, offset: number, arg: SchemaArg): (UDim2, number)
 	return UDim2.new(
-		readi16(buff, offset) / 1000,
-		readi16(buff, offset + 2),
-		readi16(buff, offset + 4) / 1000,
-		readi16(buff, offset + 6)
+		buffer.readi16(buff, offset) / 1000,
+		buffer.readi16(buff, offset + 2),
+		buffer.readi16(buff, offset + 4) / 1000,
+		buffer.readi16(buff, offset + 6)
 		), 8
 end
 
@@ -856,68 +835,68 @@ end
 	local halfSize = value.Size / 2
 	local pos = value.CFrame.Position
 	local min, max = pos - halfSize, pos + halfSize
-	writef32(buff, offset, min.X)
-	writef32(buff, offset + 4, min.Y)
-	writef32(buff, offset + 8, min.Z)
-	writef32(buff, offset + 12, max.X)
-	writef32(buff, offset + 16, max.Y)
-	writef32(buff, offset + 20, max.Z)
+	buffer.writef32(buff, offset, min.X)
+	buffer.writef32(buff, offset + 4, min.Y)
+	buffer.writef32(buff, offset + 8, min.Z)
+	buffer.writef32(buff, offset + 12, max.X)
+	buffer.writef32(buff, offset + 16, max.Y)
+	buffer.writef32(buff, offset + 20, max.Z)
 	return 24
 end
 
 @native local function decodeRegion3(buff: buffer, offset: number, arg: SchemaArg): (Region3, number)
 	return Region3.new(
 		Vector3.new(
-			readf32(buff, offset),
-			readf32(buff, offset + 4),
-			readf32(buff, offset + 8)
+			buffer.readf32(buff, offset),
+			buffer.readf32(buff, offset + 4),
+			buffer.readf32(buff, offset + 8)
 		),
 		Vector3.new(
-			readf32(buff, offset + 12),
-			readf32(buff, offset + 16),
-			readf32(buff, offset + 20)
+			buffer.readf32(buff, offset + 12),
+			buffer.readf32(buff, offset + 16),
+			buffer.readf32(buff, offset + 20)
 		)
 	), 24
 end
 
 @native local function encodePhysicalProperties(buff: buffer, offset: number, arg: SchemaArg, value: PhysicalProperties)
 	:number
-	writeu16(buff, offset, value.Density * 655.35)
-	writeu8(buff, offset + 2, value.Friction * 127.5)
-	writeu8(buff, offset + 3, value.Elasticity * 255)
-	writeu16(buff, offset + 4, value.FrictionWeight * 655.35)
-	writeu16(buff, offset + 6, value.ElasticityWeight * 655.35)
-	writeu8(buff, offset + 8, value.AcousticAbsorption * 255)
+	buffer.writeu16(buff, offset, value.Density * 655.35)
+	buffer.writeu8(buff, offset + 2, value.Friction * 127.5)
+	buffer.writeu8(buff, offset + 3, value.Elasticity * 255)
+	buffer.writeu16(buff, offset + 4, value.FrictionWeight * 655.35)
+	buffer.writeu16(buff, offset + 6, value.ElasticityWeight * 655.35)
+	buffer.writeu8(buff, offset + 8, value.AcousticAbsorption * 255)
 	return 9
 end
 
 @native local function decodePhysicalProperties(buff: buffer, offset: number, arg: SchemaArg)
 	:(PhysicalProperties, number)
 	return PhysicalProperties.new(
-		readu16(buff, offset) / 655.35,
-		readu8(buff, offset + 2) / 127.5,
-		readu8(buff, offset + 3) / 255,
-		readu16(buff, offset + 4) / 655.35,
-		readu16(buff, offset + 6) / 655.35,
-		readu8(buff, offset + 8) / 255
+		buffer.readu16(buff, offset) / 655.35,
+		buffer.readu8(buff, offset + 2) / 127.5,
+		buffer.readu8(buff, offset + 3) / 255,
+		buffer.readu16(buff, offset + 4) / 655.35,
+		buffer.readu16(buff, offset + 6) / 655.35,
+		buffer.readu8(buff, offset + 8) / 255
 	), 9
 end
 
 @native local function encodeRect(buff: buffer, offset: number, arg: SchemaArg, value: Rect): number
 	local min, max = value.Min, value.Max
-	writef32(buff, offset, min.X)
-	writef32(buff, offset + 4, min.Y)
-	writef32(buff, offset + 8, max.X)
-	writef32(buff, offset + 12, max.Y)
+	buffer.writef32(buff, offset, min.X)
+	buffer.writef32(buff, offset + 4, min.Y)
+	buffer.writef32(buff, offset + 8, max.X)
+	buffer.writef32(buff, offset + 12, max.Y)
 	return 16
 end
 
 @native local function decodeRect(buff: buffer, offset: number, arg: SchemaArg): (Rect, number)
 	return Rect.new(
-		readf32(buff, offset),
-		readf32(buff, offset + 4),
-		readf32(buff, offset + 8),
-		readf32(buff, offset + 12)
+		buffer.readf32(buff, offset),
+		buffer.readf32(buff, offset + 4),
+		buffer.readf32(buff, offset + 8),
+		buffer.readf32(buff, offset + 12)
 	), 16
 end
 
@@ -929,13 +908,13 @@ end
 	local nibPtr = 1
 
 	for i = 1, iters do
-		writeu8(buff, ptr, array[nibPtr] + array[nibPtr + 1] * 16)
+		buffer.writeu8(buff, ptr, array[nibPtr] + array[nibPtr + 1] * 16)
 		ptr += 1
 		nibPtr += 2
 	end
 	
 	if mod ~= 0 then
-		writeu8(buff, ptr, array[arrayLen])
+		buffer.writeu8(buff, ptr, array[arrayLen])
 	end
 	return ptr - offset
 end
@@ -949,7 +928,7 @@ end
 	local nibPtr = 1
 	
 	for i = 1, iters do
-		local b = readu8(buff, ptr)
+		local b = buffer.readu8(buff, ptr)
 		local n2 = b // 16
 		local n1 = b - n2 * 16
 		array[nibPtr] = n1
@@ -959,7 +938,7 @@ end
 	end
 
 	if mod ~= 0 then
-		array[arrayLen] = readu8(buff, ptr)
+		array[arrayLen] = buffer.readu8(buff, ptr)
 	end
 	return array, ptr - offset
 end
@@ -967,7 +946,7 @@ end
 @native local function encodeBulkNumberU8Array(buff: buffer, offset: number, array: {number}): number
 	local ptr = offset
 	for _, val in array do
-		writeu8(buff, ptr, val)
+		buffer.writeu8(buff, ptr, val)
 		ptr += 1
 	end
 	return ptr - offset
@@ -977,34 +956,17 @@ end
 	: ({number}, number)
 	local ptr = offset
 	local array = tbl or table.create(arrayLen)
-	local mod = arrayLen % 4
-	local iters = (arrayLen - mod) / 4
-	local bytePtr = 1
-	
-	for i = 1, iters do
-		local b = readu32(buff, ptr)
-		local b1 = b // 256
-		local b2 = b1 // 256
-		local b3 = b2 // 256		
-		array[bytePtr] = b - b1 * 256
-		array[bytePtr + 1] = b1 - b2 * 256
-		array[bytePtr + 2] = b2 - b3 * 256
-		array[bytePtr + 3] = b3
-		ptr += 4
-		bytePtr += 4
-	end
-	
-	for i = arrayLen - mod + 1, arrayLen do
-		array[i] = readu8(buff, ptr)
+	for i = 1, arrayLen do
+		array[i] = buffer.readu8(buff, ptr)
 		ptr += 1
-	end
+	end	
 	return array, ptr - offset
 end
 
 @native local function encodeBulkNumberI32Array(buff: buffer, offset: number, array: {number}): number
 	local ptr = offset
 	for _, val in array do
-		writei32(buff, ptr, val)
+		buffer.writei32(buff, ptr, val)
 		ptr += 4
 	end
 	return ptr - offset
@@ -1015,7 +977,7 @@ end
 	local ptr = offset
 	local array = tbl or table.create(arrayLen)
 	for i = 1, arrayLen do
-		array[i] = readi32(buff, ptr)
+		array[i] = buffer.readi32(buff, ptr)
 		ptr += 4
 	end
 	return array, ptr - offset
@@ -1024,7 +986,7 @@ end
 @native local function encodeBulkNumberF32Array(buff: buffer, offset: number, array: {number}): number
 	local ptr = offset
 	for _, val in array do
-		writef32(buff, ptr, val)
+		buffer.writef32(buff, ptr, val)
 		ptr += 4
 	end
 	return ptr - offset
@@ -1035,7 +997,7 @@ end
 	local ptr = offset
 	local array = tbl or table.create(arrayLen)
 	for i = 1, arrayLen do
-		array[i] = readf32(buff, ptr)
+		array[i] = buffer.readf32(buff, ptr)
 		ptr += 4
 	end
 	return array, ptr - offset
@@ -1049,22 +1011,22 @@ end
 
 	local bitPtr = 1
 	for i = 1, bitIters do
-		writeu8(buff, ptr,
-				(array[bitPtr] and 1 or 0) +
-				(array[bitPtr + 1] and 2 or 0) + 
-				(array[bitPtr + 2] and 4 or 0) +
-				(array[bitPtr + 3] and 8 or 0) +
-				(array[bitPtr + 4] and 16 or 0) +
-				(array[bitPtr + 5] and 32 or 0) +
-				(array[bitPtr + 6] and 64 or 0) +
-				(array[bitPtr + 7] and 128 or 0)
-		)
+		buffer.writeu8(buff, ptr,
+				(if array[bitPtr] then 1 else 0) +
+				(if array[bitPtr + 1] then 2 else 0) + 
+				(if array[bitPtr + 2] then 4 else 0) +
+				(if array[bitPtr + 3] then 8 else 0) +
+				(if array[bitPtr + 4] then 16 else 0) +
+				(if array[bitPtr + 5] then 32 else 0) +
+				(if array[bitPtr + 6] then 64 else 0) +
+				(if array[bitPtr + 7] then 128 else 0)
+				)
 		bitPtr += 8
 		ptr += 1
 	end
 	
 	for i = arrayLen - mod + 1, arrayLen do
-		writeu8(buff, ptr, array[i] and 1 or 0)
+		buffer.writeu8(buff, ptr, if array[i] then 1 else 0)
 		ptr += 1
 	end
 	
@@ -1096,7 +1058,7 @@ buildByteToBools()
 	local bitPtr = 1
 
 	for i = 1, bitIters do
-		local byte = readu8(buff, ptr)
+		local byte = buffer.readu8(buff, ptr)
 		ptr += 1
 		
 		local bits = byteToBools[byte]
@@ -1107,13 +1069,12 @@ buildByteToBools()
 		array[bitPtr + 4] = bits[5]
 		array[bitPtr + 5] = bits[6]
 		array[bitPtr + 6] = bits[7]
-		array[bitPtr + 7] = bits[8]
-		
+		array[bitPtr + 7] = bits[8]		
 		bitPtr += 8
 	end
 	
 	for i = arrayLen - mod + 1, arrayLen do
-		array[i] = readu8(buff, ptr) == 1
+		array[i] = buffer.readu8(buff, ptr) == 1
 		ptr += 1
 	end
 	
@@ -1121,51 +1082,45 @@ buildByteToBools()
 end
 
 @native local function encodeBulkStringArray(buff: buffer, offset: number, array: {string}): number
-	local totalLen = 0
 	local ptr = offset
-
+	
 	for _, str in array do
-		local len = stringLen(str)
-		writeu8(buff, ptr, len)
+		local len = string.len(str)
+		buffer.writeu8(buff, ptr, len)
 		ptr += 1
-		totalLen += len
 	end
-
+	
 	local largeStr = table.concat(array)
-	writestring(buff, ptr, largeStr, totalLen)
+	local totalLen = string.len(largeStr)
+	buffer.writeu32(buff, ptr, totalLen)
+	ptr += 4
+	buffer.writestring(buff, ptr, largeStr, totalLen)
 	return ptr + totalLen - offset
 end
 
 @native local function decodeBulkStringArray(buff: buffer, offset: number, arrayLen: number, tbl: {any}?)
 	: ({string}, number)
 	local ptr = offset
-	local lens = getTable()
-	local totalLen = 0
-	local array = tbl or table.create(arrayLen)
-	for i = 1, arrayLen do
-		local len = readu8(buff, ptr)
-		lens[i] = len
-		ptr += 1
-		totalLen += len
-	end
-	
-	local largeStr = readstring(buff, ptr, totalLen)
+	local array = tbl or table.create(arrayLen)	
+	local totalLenPtr = ptr + arrayLen
+	local totalLen = buffer.readu32(buff, totalLenPtr)
+	local largeStr = buffer.readstring(buff, totalLenPtr + 4, totalLen)
 	local largeStrPtr = 1
 	
-	for i, len in lens do
+	for i = 1, arrayLen do
 		local start = largeStrPtr
-		largeStrPtr += len
-		array[i] = stringSub(largeStr, start, largeStrPtr - 1)
+		largeStrPtr += buffer.readu8(buff, ptr)
+		ptr += 1
+		array[i] = string.sub(largeStr, start, largeStrPtr - 1)
 	end	
-	recycleTable(lens)
-	return array, ptr + totalLen - offset
+	return array, ptr + totalLen + 4 - offset
 end
 
 @native local function encodeBulkNumberU8DictStatic(buff: buffer, offset: number, dict: {[any]: number}, keysMap: {any})
 	: number
 	local ptr = offset
 	for _, key in keysMap do
-		writeu8(buff, ptr, dict[key])
+		buffer.writeu8(buff, ptr, dict[key])
 		ptr += 1
 	end
 	return ptr - offset
@@ -1176,7 +1131,7 @@ end
 	local ptr = offset
 	local dict = table.clone(template)
 	for _, key in keysMap do
-		dict[key] = readu8(buff, ptr)
+		dict[key] = buffer.readu8(buff, ptr)
 		ptr += 1
 	end
 	return dict, ptr - offset
@@ -1186,7 +1141,7 @@ end
 	: number
 	local ptr = offset
 	for _, key in keysMap do
-		writei32(buff, ptr, dict[key])
+		buffer.writei32(buff, ptr, dict[key])
 		ptr += 4
 	end
 	return ptr - offset
@@ -1197,7 +1152,7 @@ end
 	local ptr = offset
 	local dict = table.clone(template)
 	for _, key in keysMap do
-		dict[key] = readi32(buff, ptr)
+		dict[key] = buffer.readi32(buff, ptr)
 		ptr += 4
 	end
 	return dict, ptr - offset
@@ -1208,7 +1163,7 @@ end
 	local ptr = offset
 
 	for _, key in keysMap do
-		writef32(buff, ptr, dict[key])
+		buffer.writef32(buff, ptr, dict[key])
 		ptr += 4
 	end
 	return ptr - offset
@@ -1219,7 +1174,7 @@ end
 	local ptr = offset
 	local dict = table.clone(template)
 	for _, key in keysMap do
-		dict[key] = readf32(buff, ptr)
+		dict[key] = buffer.readf32(buff, ptr)
 		ptr += 4
 	end
 	return dict, ptr - offset
@@ -1229,7 +1184,7 @@ end
 	: number
 	local ptr = offset
 	for _, key in keysMap do
-		writeu8(buff, ptr, dict[key] and 1 or 0)
+		buffer.writeu8(buff, ptr, dict[key] and 1 or 0)
 		ptr += 1
 	end
 	return ptr - offset
@@ -1240,7 +1195,7 @@ end
 	local ptr = offset
 	local dict = table.clone(template)
 	for _, key in keysMap do
-		dict[key] = readu8(buff, ptr) == 1
+		dict[key] = buffer.readu8(buff, ptr) == 1
 		ptr += 1
 	end
 	return dict, ptr - offset
@@ -1253,15 +1208,15 @@ end
 	
 	for i, key in keysMap do
 		local val = dict[key]
-		local strLen = stringLen(val)
-		writeu8(buff, ptr, strLen)
+		local strLen = string.len(val)
+		buffer.writeu8(buff, ptr, strLen)
 		ptr += 1
 		str[i] = val
 	end
 	
 	local largeStr = table.concat(str)
-	local totalStrLen = stringLen(largeStr)
-	writestring(buff, ptr, largeStr, totalStrLen)
+	local totalStrLen = string.len(largeStr)
+	buffer.writestring(buff, ptr, largeStr, totalStrLen)
 	ptr += totalStrLen
 	recycleTable(str)
 	return ptr - offset
@@ -1277,17 +1232,17 @@ end
 	local lens = getTable()
 	
 	for i = 1, dictLen do
-		local len = readu8(buff, ptr)
+		local len = buffer.readu8(buff, ptr)
 		lens[i] = len
 		totalLen += len
 		ptr += 1
 	end
 	
-	local largeStr = readstring(buff, offset + dictLen, totalLen)
+	local largeStr = buffer.readstring(buff, offset + dictLen, totalLen)
 	for i, key in keysMap do
 		local start = strPtr
 		strPtr += lens[i]
-		dict[key] = stringSub(largeStr, start, strPtr - 1)
+		dict[key] = string.sub(largeStr, start, strPtr - 1)
 	end
 	recycleTable(lens)
 	return dict, strPtr - offset
@@ -1300,13 +1255,13 @@ end
 	
 	if keys then
 		for key, val in dict do
-			writeu8(buff, ptr, key)
+			buffer.writeu8(buff, ptr, key)
 			ptr += 1
 		end
 		len = ptr - offset
 	else
 		for key, val in dict do
-			writeu8(buff, ptr, val)
+			buffer.writeu8(buff, ptr, val)
 			ptr += 1
 		end
 	end
@@ -1320,13 +1275,13 @@ end
 
 	if keys then
 		for key, val in dict do
-			writei32(buff, ptr, key)
+			buffer.writei32(buff, ptr, key)
 			ptr += 4
 		end
 		len = ptr - offset
 	else
 		for key, val in dict do
-			writei32(buff, ptr, val)
+			buffer.writei32(buff, ptr, val)
 			ptr += 4
 		end
 	end
@@ -1340,13 +1295,13 @@ end
 	
 	if keys then
 		for key, val in dict do
-			writef32(buff, ptr, key)
+			buffer.writef32(buff, ptr, key)
 			ptr += 4
 		end
 		len = (ptr - offset) / 4
 	else
 		for key, val in dict do
-			writef32(buff, ptr, val)
+			buffer.writef32(buff, ptr, val)
 			ptr += 4
 		end
 	end
@@ -1360,13 +1315,13 @@ end
 	
 	if keys then
 		for key, val in dict do
-			writeu8(buff, ptr, key and 1 or 0)
+			buffer.writeu8(buff, ptr, if key then 1 else 0)
 			ptr += 1
 		end
 		len = ptr - offset
 	else
 		for key, val in dict do
-			writeu8(buff, ptr, val and 1 or 0)
+			buffer.writeu8(buff, ptr, if val then 1 else 0)
 			ptr += 1
 		end
 	end
@@ -1377,13 +1332,12 @@ end
 	: (number, number?)
 	local ptr = offset
 	local str = getTable()
-	
 	local len
 	if keys then
 		len = 0
 		for key, val in dict do
-			local strLen = stringLen(key)
-			writeu8(buff, ptr, strLen)
+			local strLen = string.len(key)
+			buffer.writeu8(buff, ptr, strLen)
 			ptr += 1
 			len += 1
 			str[len] = key
@@ -1391,17 +1345,20 @@ end
 	else
 		local count = 0
 		for key, val in dict do
-			local strLen = stringLen(val)
-			writeu8(buff, ptr, strLen)
+			local strLen = string.len(val)
+			buffer.writeu8(buff, ptr, strLen)
 			ptr += 1
 			count += 1
 			str[count] = val
 		end
 	end	
+	
 	local largeStr = table.concat(str)
-	local totalStrLen = stringLen(largeStr)
-	writestring(buff, ptr, largeStr, totalStrLen)
-	ptr += totalStrLen
+	local bigStrLen = string.len(largeStr)
+	buffer.writeu32(buff, ptr, bigStrLen)
+	ptr += 4
+	buffer.writestring(buff, ptr, largeStr, bigStrLen)
+	ptr += bigStrLen
 	recycleTable(str)
 	return ptr - offset, len
 end
@@ -1412,12 +1369,12 @@ local encodeData: {[number]: (buffer, number, any, any?, any?) -> number}
 local decodeData: {[number]: (buffer, number, any?, any?) -> (any, number)}
 
 @native local function encodeEnumItem(buff: buffer, offset: number, arg: SchemaArg, value: EnumItem): number
-	writeu16(buff, offset, enumItemsByEnum[value] or 0)
+	buffer.writeu16(buff, offset, enumItemsByEnum[value] or 0)
 	return 2
 end
 
 @native local function decodeEnumItem(buff: buffer, offset: number, arg: SchemaArg): (EnumItem?, number)
-	local idx = readu16(buff, offset)
+	local idx = buffer.readu16(buff, offset)
 	return enumItems[idx], 2
 end
 
@@ -1435,18 +1392,70 @@ end
 end
 
 @native local function encodePlayer(buff: buffer, offset: number, arg: SchemaArg, value: Player): number
-	writef64(buff, offset, value.UserId or 0)
+	buffer.writef64(buff, offset, value.UserId or 0)
 	return 8
 end
 
 @native local function decodePlayer(buff: buffer, offset: number, arg: SchemaArg): (Player?, number)
-	local player = Players:GetPlayerByUserId(readf64(buff, offset))
+	local player = Players:GetPlayerByUserId(buffer.readf64(buff, offset))
 	return player, 8	
+end
+
+@native local function encodeFont(buff: buffer, offset: number, arg: SchemaArg, value: Font): number
+	local family = value.Family
+	local len = string.len(family)
+	buffer.writeu8(buff, offset, len)
+	offset += 1
+	buffer.writestring(buff, offset, family, len)
+	offset += len
+	buffer.writeu16(buff, offset, value.Weight.Value)
+	buffer.writeu8(buff, offset + 2, value.Style.Value)
+	return 4 + len
+end
+
+@native local function decodeFont(buff: buffer, offset: number, arg: SchemaArg): (Font, number)
+	local len = buffer.readu8(buff, offset)
+	offset += 1
+	local family = buffer.readstring(buff, offset, len)
+	offset += len
+	local font = Font.new(
+		family,
+		Enum.FontWeight:FromValue(buffer.readu16(buff, offset)),
+		Enum.FontStyle:FromValue(buffer.readu8(buff, offset + 2))		
+	)
+	return font, 4 + len
+end
+
+@native local function encodeRay(buff: buffer, offset: number, arg: SchemaArg, value: Ray): number
+	local origin = value.Origin
+	local direction = value.Direction
+	buffer.writef32(buff, offset, origin.X)
+	buffer.writef32(buff, offset + 4, origin.Y)
+	buffer.writef32(buff, offset + 8, origin.Z)
+	buffer.writef32(buff, offset + 12, direction.X)
+	buffer.writef32(buff, offset + 16, direction.Y)
+	buffer.writef32(buff, offset + 20, direction.Z)
+	return 24
+end
+
+@native local function decodeRay(buff: buffer, offset: number, arg: SchemaArg): (Ray, number)
+	return Ray.new(
+		Vector3.new(
+			buffer.readf32(buff, offset),
+			buffer.readf32(buff, offset + 4),
+			buffer.readf32(buff, offset + 8)
+		),
+		Vector3.new(
+			buffer.readf32(buff, offset + 12),
+			buffer.readf32(buff, offset + 16),
+			buffer.readf32(buff, offset + 20)
+		)
+	), 24
 end
 
 @native local function encodeAny(buff: buffer, offset: number, arg: SchemaArg, value: any, inst: {Instance}): number
 	local dataType = getDataType(value)
-	writeu8(buff, offset, dataType)
+	buffer.writeu8(buff, offset, dataType)
 	local bytes = 1
 	local encode = encodeData[dataType] :: ((buffer, number, SchemaArg, any, {Instance}?) -> number)?
 	bytes += encode(buff, offset + bytes, arg, value, inst)
@@ -1454,7 +1463,7 @@ end
 end
 
 @native local function decodeAny(buff: buffer, offset: number, arg: SchemaArg, inst: {Instance}?): (any, number)
-	local dataType = readu8(buff, offset)
+	local dataType = buffer.readu8(buff, offset)
 	local bytes = 1
 	local decode = decodeData[dataType] :: (buffer, number, SchemaArg, {Instance}?) -> (any, number)
 	if not decode then
@@ -1468,7 +1477,7 @@ end
 	: number
 	local isNil = value == nil
 	local tag = isNil and 0 or 1
-	writeu8(buff, offset, tag)
+	buffer.writeu8(buff, offset, tag)
 	if isNil then
 		return 1
 	end
@@ -1481,7 +1490,7 @@ end
 
 @native local function decodeOptional(buff: buffer, offset: number, arg: SchemaArg, inst: {Instance}?)
 	: (any, number)
-	local isNil = readu8(buff, offset) == 0
+	local isNil = buffer.readu8(buff, offset) == 0
 	if isNil then return nil, 1 end
 	
 	local valArg = arg[2]
@@ -1490,12 +1499,12 @@ end
 	return val, b + 1
 end
 
-@native local function encodeUnion(buff: buffer, offset: number, arg: SchemaArg, value: any, inst: {Instance}?)
+@native local function encodeUnion(buff: buffer, offset: number, arg: SchemaArg, value: any, inst: {Instance})
 	: number
 	local dt = typeof(value)
 	local valArg = arg[dt]
 	local tag = dt ~= "table" and valArg or valArg[1]
-	writeu8(buff, offset, tag)
+	buffer.writeu8(buff, offset, tag)
 	
 	local encode = encodeData[tag] :: (buffer, number, SchemaArg, any, {Instance}?) -> number
 	local bytes = encode(buff, offset + 1, valArg, value, inst)
@@ -1503,7 +1512,7 @@ end
 end
 
 @native local function decodeUnion(buff: buffer, offset: number, arg: SchemaArg, inst: {Instance}?): (any, number)
-	local tag = readu8(buff, offset)
+	local tag = buffer.readu8(buff, offset)
 	local valArg = arg[tag]
 	local decode = decodeData[tag] :: (buffer, number, SchemaArg, {Instance}?) -> (any, number)
 	local val, b = decode(buff, offset + 1, valArg, inst)
@@ -1513,13 +1522,26 @@ end
 @native local function encodeLiteral(buff: buffer, offset: number, arg: SchemaArg, value: Literal)
 	:number
 	local reverseMap = arg[3]
-	writeu8(buff, offset, reverseMap[value])
+	buffer.writeu8(buff, offset, reverseMap[value])
 	return 1
 end
 
 @native local function decodeLiteral(buff: buffer, offset: number, arg: SchemaArg): (Literal, number)
 	local map = arg[2]
-	return map[readu8(buff, offset)], 1
+	return map[buffer.readu8(buff, offset)], 1
+end
+
+@native local function encodeCustom(buff: buffer, offset: number, schema: SchemaArg, value: any, inst: {Instance})
+	: number
+	local encode = schema[2]
+	local metadata = schema[4]
+	return encode(buff, offset, value, inst, metadata)
+end
+
+@native local function decodeCustom(buff: buffer, offset: number, schema: SchemaArg, inst: {Instance}?): (any, number)
+	local decode = schema[3]
+	local metadata = schema[4]
+	return decode(buff, offset, inst, metadata)
 end
 
 @native local function encodeArrayStatic(buff: buffer, offset: number, schema: SchemaArg, array: {any}, inst: {Instance})
@@ -1562,15 +1584,80 @@ end
 	return array, ptr - offset
 end
 
+@native local function encodeBulkStructArray(buff: buffer, offset: number, array: {any}, _: boolean, schema: SchemaArg, 
+	inst: {Instance}, isDict: boolean?): number
+	local structSchema = isDict and schema[3] or schema[2]
+	local keysMap = structSchema[3]
+	local fastPath = structSchema[5]
+	local ptr = offset
+	
+	if fastPath then
+		local encode = encodeData[fastPath]
+		for _, struct in array do
+			ptr += encode(buff, ptr, struct, keysMap)
+		end
+		return ptr - offset
+	end
+	
+	local data = structSchema[2]
+	for _, struct in array do
+		for i, key in keysMap do
+			local arg = data[i]
+			local val = struct[key]
+			local encode = (encodeData[arg] or encodeData[arg[1]]) :: 
+			(buffer, number, SchemaArg, any, {Instance}?) -> number
+			ptr += encode(buff, ptr, arg, val, inst)
+		end
+	end
+	return ptr - offset
+end
+
+@native local function decodeBulkStructArray(buff: buffer, offset: number, len: number, tbl: {any}?, schema: SchemaArg, inst: {Instance}?,
+	isDict: boolean?)
+	: ({any}, number)
+	local ptr = offset
+	local structSchema = isDict and schema[3] or schema[2]
+	local keysMap = structSchema[3]
+	local template = structSchema[4]
+	local fastPath = structSchema[5]
+	
+	local array = tbl or table.create(len)
+	if fastPath then
+		local decode = decodeData[fastPath]
+		for i = 1, len do
+			local struct, b = decode(buff, ptr, keysMap, template)
+			ptr += b
+			array[i] = struct
+		end
+		return array, ptr - offset
+	end
+	
+	local data = structSchema[2]
+	
+	for i = 1, len do
+		local struct = table.clone(template)	
+		for i, arg in data do
+			local decode = (decodeData[arg] or decodeData[arg[1]])
+			:: (buffer, number, SchemaArg, {Instance}?) -> (any, number)
+			local val, b = decode(buff, ptr, arg, inst)
+			ptr += b
+			local key = keysMap[i]
+			struct[key] = val
+		end
+		array[i] = struct
+	end	
+	return array, ptr - offset
+end
+
 @native local function encodeArray(buff: buffer, offset: number, schema: SchemaArg, array: {any}, inst: {Instance})
 	: number
 	local len = #array
-	writeu16(buff, offset, len)
+	buffer.writeu16(buff, offset, len)
 	local ptr = offset + 2
 	
 	local fastPath = schema[3]
 	if fastPath then
-		ptr += encodeData[fastPath](buff, ptr, array)
+		ptr += encodeData[fastPath](buff, ptr, array, false, schema, inst)
 		return ptr - offset
 	end
 	
@@ -1583,12 +1670,12 @@ end
 end
 
 @native local function decodeArray(buff: buffer, offset: number, schema: SchemaArg, inst: {Instance}?): ({any}, number)
-	local len = readu16(buff, offset)
+	local len = buffer.readu16(buff, offset)
 	local ptr = offset + 2
 	
 	local fastPath = schema[3]
 	if fastPath then
-		local array, b = decodeData[fastPath](buff, ptr, len)
+		local array, b = decodeData[fastPath](buff, ptr, len, nil, schema, inst)
 		return array, ptr + b - offset
 	end
 	
@@ -1607,13 +1694,13 @@ end
 @native local function encodeArrayDynamic(buff: buffer, offset: number, schema: SchemaArg, array: {any}, inst: {Instance})
 	: number
 	local len = #array
-	writeu16(buff, offset, len)
+	buffer.writeu16(buff, offset, len)
 	local ptr = offset + 2
 
 	for i = 1, len do
 		local val = array[i]
 		local dataType = getDataType(val)
-		writeu8(buff, ptr, dataType)
+		buffer.writeu8(buff, ptr, dataType)
 		ptr += 1
 		local encode = encodeData[dataType] :: (buffer, number, SchemaArg, any, {Instance}?) -> number
 		ptr += encode(buff, ptr, schema, val, inst)
@@ -1623,14 +1710,14 @@ end
 
 @native local function decodeArrayDynamic(buff: buffer, offset: number, schema: SchemaArg, inst: {Instance}?)
 	: ({any}, number)
-	local len = readu16(buff, offset)
+	local len = buffer.readu16(buff, offset)
 	local ptr = offset + 2
 	local array = table.create(len)
 
 	for i = 1, len do
-		local dataType = readu8(buff, ptr)
+		local dataType = buffer.readu8(buff, ptr)
 		ptr += 1
-		local decode = (decodeData[dataType] or decodeData[Enums.Nil])
+		local decode = (decodeData[dataType] or decodeData[ENUM_NIL])
 		:: (buffer, number, SchemaArg, {Instance}?) -> (any, number)
 		local val, b = decode(buff, ptr, schema, inst)
 		ptr += b
@@ -1711,7 +1798,7 @@ end
 	end
 	
 	if valFastPath then
-		ptr += encodeData[valFastPath](buff, ptr, dict)
+		ptr += encodeData[valFastPath](buff, ptr, dict, false, schema, inst, true)
 	else
 		local valArg = schema[3]
 		local encodeVal = encodeData[valArg] or encodeData[valArg[1]] 
@@ -1721,14 +1808,14 @@ end
 		end
 	end
 
-	writeu16(buff, offset, len)
+	buffer.writeu16(buff, offset, len)
 	return ptr - offset
 end
 
 local dictTempCache: {[number]: {[any]: any}} = {}
 
 @native local function decodeDict(buff: buffer, offset: number, schema: SchemaArg, inst: {Instance}?): ({[any]: any}, number)
-	local len = readu16(buff, offset)
+	local len = buffer.readu16(buff, offset)
 	local ptr = offset + 2	
 	local keyFastPath = schema[4]
 	local valFastPath = schema[5]	
@@ -1736,7 +1823,7 @@ local dictTempCache: {[number]: {[any]: any}} = {}
 	
 	if keyFastPath then
 		local bytes
-		keys, bytes = decodeData[keyFastPath](buff, ptr, len, keys)
+		keys, bytes = decodeData[keyFastPath](buff, ptr, len, keys, schema, inst)
 		ptr += bytes
 	else
 		local keyArg = schema[2]
@@ -1751,7 +1838,7 @@ local dictTempCache: {[number]: {[any]: any}} = {}
 	
 	if valFastPath then
 		local bytes
-		vals, bytes = decodeData[valFastPath](buff, ptr, len, vals)
+		vals, bytes = decodeData[valFastPath](buff, ptr, len, vals, schema, inst, true)
 		ptr += bytes
 	else
 		local valArg = schema[3]
@@ -1794,38 +1881,38 @@ end
 	for key, val in dict do
 		local keyType = getDataType(key)	
 		local encodeKey = encodeData[keyType] ::  (buffer, number, SchemaArg, any, {Instance}?) -> number
-		writeu8(buff, ptr, keyType)			
+		buffer.writeu8(buff, ptr, keyType)			
 		ptr += 1
 		ptr += encodeKey(buff, ptr, schema, key, inst)
 		
 		local valType = getDataType(val)
 		local encodeVal = encodeData[valType] :: (buffer, number, SchemaArg, any, {Instance}?) -> number
-		writeu8(buff, ptr, valType)
+		buffer.writeu8(buff, ptr, valType)
 		ptr += 1
 		ptr += encodeVal(buff, ptr, schema, val, inst)
 		idx += 1
 	end
-	writeu16(buff, offset, idx)
+	buffer.writeu16(buff, offset, idx)
 	return ptr - offset
 end
 
 @native local function decodeDictDynamic(buff: buffer, offset: number, schema: SchemaArg, inst: {Instance}?)
 	: ({[any]: any}, number)
-	local len = readu16(buff, offset)
+	local len = buffer.readu16(buff, offset)
 	local ptr = offset + 2
 	local dict = {}
 
 	for i = 1, len do
-		local keyType = readu8(buff, ptr)
+		local keyType = buffer.readu8(buff, ptr)
 		ptr += 1
-		local decodeKey = (decodeData[keyType] or decodeData[Enums.Nil])
+		local decodeKey = (decodeData[keyType] or decodeData[ENUM_NIL])
 		:: (buffer, number, SchemaArg, {Instance}?) -> (any, number)
 		local key, b = decodeKey(buff, ptr, schema, inst)
 		ptr += b
 
-		local valType = readu8(buff, ptr)
+		local valType = buffer.readu8(buff, ptr)
 		ptr += 1
-		local decodeVal = (decodeData[valType] or decodeData[Enums.Nil])
+		local decodeVal = (decodeData[valType] or decodeData[ENUM_NIL])
 		:: (buffer, number, SchemaArg, {Instance}?) -> (any, number)
 		local val, b = decodeVal(buff, ptr, schema, inst)
 		ptr += b
@@ -1888,11 +1975,15 @@ encodeData = {
 	[Enums.Region3] = encodeRegion3,
 	[Enums.PhysicalProperties] = encodePhysicalProperties,
 	[Enums.Rect] = encodeRect,
+	[Enums.Font] = encodeFont,
+	[Enums.Ray] = encodeRay,
 
 	[Enums.Any] = encodeAny,
 	[Enums.Optional] = encodeOptional,
 	[Enums.Union] = encodeUnion,
 	[Enums.Literal] = encodeLiteral,
+	[Enums.Custom] = encodeCustom,
+	
 	[Enums.ArrayStatic] = encodeArrayStatic,
 	[Enums.Array] = encodeArray,
 	[Enums.ArrayDynamic] = encodeArrayDynamic,
@@ -1906,6 +1997,7 @@ encodeData = {
 	[Enums.FastNumberF32Array] = encodeBulkNumberF32Array,
 	[Enums.FastBoolArray] = encodeBulkBoolArray,
 	[Enums.FastStringArray] = encodeBulkStringArray,
+	[Enums.FastStructArray] = encodeBulkStructArray,
 	[Enums.FastNumberU8DictStatic] = encodeBulkNumberU8DictStatic,
 	[Enums.FastNumberI32DictStatic] = encodeBulkNumberI32DictStatic,
 	[Enums.FastNumberF32DictStatic] = encodeBulkNumberF32DictStatic,
@@ -1916,6 +2008,7 @@ encodeData = {
 	[Enums.FastNumberF32Dict] = encodeBulkNumberF32Dict,
 	[Enums.FastBoolDict] = encodeBulkBoolDict,
 	[Enums.FastStringDict] = encodeBulkStringDict,
+	[Enums.FastStructDict] = encodeBulkStructArray,
 }
 
 decodeData = {
@@ -1972,11 +2065,15 @@ decodeData = {
 	[Enums.Region3] = decodeRegion3,
 	[Enums.PhysicalProperties] = decodePhysicalProperties,
 	[Enums.Rect] = decodeRect,
+	[Enums.Font] = decodeFont,
+	[Enums.Ray] = decodeRay,
 
 	[Enums.Any] = decodeAny,
 	[Enums.Optional] = decodeOptional,
 	[Enums.Union] = decodeUnion,
 	[Enums.Literal] = decodeLiteral,
+	[Enums.Custom] = decodeCustom,
+	
 	[Enums.ArrayStatic] = decodeArrayStatic,
 	[Enums.Array] = decodeArray,
 	[Enums.ArrayDynamic] = decodeArrayDynamic,
@@ -1990,6 +2087,7 @@ decodeData = {
 	[Enums.FastNumberF32Array] = decodeBulkNumberF32Array,
 	[Enums.FastBoolArray] = decodeBulkBoolArray,
 	[Enums.FastStringArray] = decodeBulkStringArray,
+	[Enums.FastStructArray] = decodeBulkStructArray,
 	[Enums.FastNumberU8DictStatic] = decodeBulkNumberU8DictStatic,
 	[Enums.FastNumberI32DictStatic] = decodeBulkNumberI32DictStatic,
 	[Enums.FastNumberF32DictStatic] = decodeBulkNumberF32DictStatic,
@@ -2000,6 +2098,7 @@ decodeData = {
 	[Enums.FastNumberF32Dict] = decodeBulkNumberF32Array,
 	[Enums.FastBoolDict] = decodeBulkBoolArray,
 	[Enums.FastStringDict] = decodeBulkStringArray,
+	[Enums.FastStructDict] = decodeBulkStructArray,
 }
 
 return {

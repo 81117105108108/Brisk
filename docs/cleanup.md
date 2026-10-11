@@ -3,8 +3,8 @@ layout: docs
 title: Cleanup
 ---
 
-## ``QuickNetConnection``
-QuickNetConnection objects can be used to clean up network connections. They are compatible with the Janitor module.
+## ``Connection``
+Connection objects can be used to clean up network connections.
 
 ### ``.Connected``
 A read-only boolean property that indicates if the connection is currently connected.
@@ -18,7 +18,4 @@ Disconnects a listener.
 ```lua
 conn:Disconnect()
 ```
-
-### ``:Destroy()``
-Does the same thing as ``:Disconnect``.
 

@@ -776,7 +776,9 @@ local function EncodeReturn_Net_RemoteFunction_function_1(result)
     local varSize = 0
     local arrayLen_1 = #result
     prefixSize += 2
-    varSize += ((arrayLen_1 + 7) // 8)
+    for arrayIndex_2 = 1, arrayLen_1 do
+        varSize += 1
+    end
     local totalSize = 1 + prefixSize + varSize
     local payload = create(totalSize)
     writeu8(payload, 0, MESSAGE_ID_Net_RemoteFunction_function_1)
@@ -785,22 +787,8 @@ local function EncodeReturn_Net_RemoteFunction_function_1(result)
     local varOffset = fixedOffset
     writeu16(payload, prefixOffset, arrayLen_1)
     prefixOffset += 2
-    local arrayPackedByteCount_5 = ((arrayLen_1 + 7) // 8)
-    local arrayValueIndex_7 = 1
-    for arrayPackedIndex_6 = 1, arrayPackedByteCount_5 do
-        local arrayPackedByte_10 = 0
-        local arrayBitMask_9 = 1
-        for arrayBitIndex_8 = 1, 8 do
-            if arrayValueIndex_7 > arrayLen_1 then
-                break
-            end
-            if result[arrayValueIndex_7] then
-                arrayPackedByte_10 = bor(arrayPackedByte_10, arrayBitMask_9)
-            end
-            arrayValueIndex_7 += 1
-            arrayBitMask_9 = lshift(arrayBitMask_9, 1)
-        end
-        writeu8(payload, varOffset, arrayPackedByte_10)
+    for arrayIndex_4 = 1, arrayLen_1 do
+        writeu8(payload, varOffset, result[arrayIndex_4])
         varOffset += 1
     end
     return payload
@@ -821,33 +809,22 @@ local function DecodeReturn_Net_RemoteFunction_function_1(payload, payloadLength
         error(ERR_BOUNDS)
     end
     local arrayValues_7 = table.create(arrayCount_2)
-    local arrayPackedByteCount_9 = ((arrayCount_2 + 7) // 8)
-    local arrayPackedCursor_10 = varCursor_5
-    local arrayPackedNext_11 = arrayPackedCursor_10 + arrayPackedByteCount_9
-    if arrayPackedNext_11 > payloadLength then
-        error(ERR_BOUNDS)
-    end
-    local arrayUnpackIndex_13 = 1
-    for arrayPackedIndex_12 = 1, arrayPackedByteCount_9 do
-        local arrayPackedByte_14 = readu8(payload, arrayPackedCursor_10)
-        arrayPackedCursor_10 += 1
-        local arrayBitMask_16 = 1
-        for arrayBitIndex_15 = 1, 8 do
-            if arrayUnpackIndex_13 > arrayCount_2 then
-                break
-            end
-            arrayValues_7[arrayUnpackIndex_13] = band(arrayPackedByte_14, arrayBitMask_16) ~= 0
-            arrayUnpackIndex_13 += 1
-            arrayBitMask_16 = lshift(arrayBitMask_16, 1)
+    for arrayIndex_6 = 1, arrayCount_2 do
+        local arrayValue_8
+        local fieldNext_9 = varCursor_5 + 1
+        if fieldNext_9 > payloadLength then
+            error(ERR_BOUNDS)
         end
+        arrayValue_8 = (readu8(payload, varCursor_5) :: u8)
+        varCursor_5 = fieldNext_9
+        arrayValues_7[arrayIndex_6] = arrayValue_8
     end
-    varCursor_5 = arrayPackedCursor_10
     decoded_result = arrayValues_7
     offset = varCursor_5
     return decoded_result, offset
 end
 
-local Handler_Net_RemoteFunction_function_1: ((player: Player, data: { u8 }) -> { boolean })? = nil
+local Handler_Net_RemoteFunction_function_1: ((player: Player, data: { u8 }) -> { u8 })? = nil
 local HandlerToken_Net_RemoteFunction_function_1 = 0
 
 function Net_RemoteFunction_function_1.On(callback: Net_RemoteFunction_function_ServerFunctionCallback): Connection
@@ -863,7 +840,7 @@ function Net_RemoteFunction_function_1.On(callback: Net_RemoteFunction_function_
     end)
 end
 
-function Net_RemoteFunction_function_1.Call(player: Player, data: { u8 }): { boolean }
+function Net_RemoteFunction_function_1.Call(player: Player, data: { u8 }): { u8 }
     if typeof(player) ~= "Instance" or not player:IsA("Player") then
         error(ERR_TYPE)
     end

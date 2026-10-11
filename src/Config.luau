@@ -7,9 +7,9 @@ local Config = {
 	DebugMode = true,
 	DefaultRateLimit = {Max = 60, Time = 1},
 	DefaultResponseTimeout = 10,
-	MaxCallsPerFrame = 1000,
-	MaxPacketSize = 5000000, --recommended 10-50K
-	ClientAllocationSize = 5000000, --recommended 1-5M
+	MaxCallsPerFrame = 100,
+	MaxPacketSize = 50000, --recommended 10-50K
+	ClientAllocationSize = 2000000, --recommended 1-5M
 	ServerAllocationSize = 1000000, --recommended 500K-2M
 }
 

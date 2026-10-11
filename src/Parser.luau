@@ -164,6 +164,9 @@ local function dictDynamic(): {[any]: any}
 end
 
 local function optional<T>(dataType: T): T?
+	if dataType == nil then
+		error(`{SOURCE} the input to data.optional cannot be nil`, 2)
+	end
 	return {
 		Enums.Optional,
 		dataType,
@@ -176,27 +179,25 @@ local function parseUnion(data: any, union: {any})
 	if isTable then
 		local enum = data[1]
 		if enum == Enums.Optional then
-			error(SOURCE.." optional type cannot be unioned", 2)
-			return
+			error(`{SOURCE} optional type cannot be unioned`, 2)
 				
 		elseif enum == Enums.Any then
-			error(SOURCE.." Any type cannot be unioned", 2)
-			return
+			error(`{SOURCE} Any type cannot be unioned`, 2)
 				
 		elseif enum == Enums.Literal then
-			error(SOURCE.." literal types cannot be unioned", 2)
-			return
+			error(`{SOURCE} literal types cannot be unioned`, 2)
 		end
-		union["table"] = data
+		if union.table ~= nil then
+			error(`{SOURCE} Cannot union multiple tables`, 2)
+		end
+		union.table = data
 	else
 		local native = EnumsToNative[data]
 		if not native then
-			error(SOURCE.." invalid union type", 2)
-			return
+			error(`{SOURCE} invalid union type`, 2)
 		end
 		if union[native] ~= nil then
-			error(SOURCE.. " cannot union multiple types of the same native type", 2)
-			return
+			error(`{SOURCE} cannot union multiple types of the same native type`, 2)
 		end
 		union[native] = data
 	end
@@ -224,8 +225,7 @@ local function literal<T...>(...: T...): Types.Literal
 	for _, val in map do
 		local dt = typeof(val)
 		if dt ~= "string" and dt ~= "number" and dt ~= "boolean" and dt ~= "Vector3" then
-			error(SOURCE.." unsupported literal type: "..dt, 2)
-			return
+			error(`{SOURCE} unsupported literal type: {dt}`, 2)
 		end
 	end
 	local reverseMap = keyValueSwap(map)
@@ -237,26 +237,58 @@ local function literal<T...>(...: T...): Types.Literal
 	return literal
 end
 
+local function custom(
+	encode: (buff: buffer, offset: number, value: any, instances: {Instance}, metadata: any) -> number, 
+	decode: (buff: buffer, offset: number, instances: {Instance}?, metadata: any) -> (any, number),
+	metadata: any): any
+	
+	if type(encode) ~= "function" then
+		error(`{SOURCE} First argument must be a function`, 2)
+	end
+	
+	if type(decode) ~= "function" then
+		error(`{SOURCE} Second argument must be a function`, 2)
+	end
+	
+	return {
+		Enums.Custom,
+		encode,
+		decode,
+		metadata,
+	}
+end
+
+local function updateTableStructFastPath(innerData: any, newSchema: any, idx: number, enum: number)
+	if type(innerData) == "table" then
+		if innerData[1] == Enums.DictStatic then
+			newSchema[idx] = enum
+		end
+	end
+end
+
 local function processSchema(schema: {[any]: any})
 	if type(schema) ~= "table" then
 		if not reverseEnums[schema] then
-			error(SOURCE.." invalid data type", 2)
+			error(`{SOURCE} invalid data type`, 2)
 		end
 		return schema
 	end
 	
-	local dt = schema[1]	
-	local isLiteral = dt == Enums.Literal
-	if isLiteral then return schema end
+	local dt = schema[1]
+	if dt == Enums.Custom then
+		return schema
+	end
 	
-	local isOptional = dt == Enums.Optional
-	if isOptional then
+	if dt == Enums.Literal then
+		return schema
+	end
+	
+	if dt == Enums.Optional then
 		schema[2] = processSchema(schema[2])
 		return schema
 	end
 	
-	local isUnion = dt == Enums.Union
-	if isUnion then
+	if dt == Enums.Union then
 		local reverseMap = {}
 		for k, val in schema do
 			if type(k) ~= "string" then
@@ -291,6 +323,9 @@ local function processSchema(schema: {[any]: any})
 	end
 
 	local k, v = next(schema)
+	if k == nil and v == nil then
+		error(`{SOURCE} Empty table is not a valid schema`, 2)
+	end
 	local isArray = count == 1 and k == 1
 	local isDict = not isArray and count == 1
 	local isDictStatic = not isArrayStatic and count > 1
@@ -301,7 +336,9 @@ local function processSchema(schema: {[any]: any})
 		if data == Enums.Any then
 			newSchema = arrayDynamic()
 		else
-			newSchema[2] = processSchema(data)
+			local innerData = processSchema(data)
+			updateTableStructFastPath(innerData, newSchema, 3, Enums.FastStructArray)
+			newSchema[2] = innerData
 		end
 
 	elseif isArrayStatic then
@@ -321,7 +358,9 @@ local function processSchema(schema: {[any]: any})
 			newSchema = dictDynamic()
 		else
 			newSchema[2] = processSchema(key)
-			newSchema[3] = processSchema(val)
+			local innerVal = processSchema(val)
+			updateTableStructFastPath(innerVal, newSchema, 5, Enums.FastStructDict)
+			newSchema[3] = innerVal
 		end
 
 	elseif isDictStatic then
@@ -332,7 +371,7 @@ local function processSchema(schema: {[any]: any})
 		end
 
 	else
-		error(SOURCE.. " invalid schema", 2)
+		error(`{SOURCE} invalid schema`, 2)
 	end
 	return newSchema
 end
@@ -351,6 +390,7 @@ local Parser = {
 	union = union,
 	unionMany = unionMany,
 	literal = literal,
+	custom = custom,
 }
 
 return Parser

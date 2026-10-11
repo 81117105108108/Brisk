@@ -1,12 +1,14 @@
 local Modes = {}
 
 Modes.Enabled = {
-	"QuickNet",
 	"NetRay",
+	"QuickNet",
 	"Blink",
+	"Lync",
 	"Jolt",
 	"RemoteEvent",
 	"Packet",
+	--"ByteNet",
 }
 
 return Modes

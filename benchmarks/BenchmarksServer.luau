@@ -4,8 +4,11 @@ local remote = Instance.new("RemoteEvent")
 remote.Name = "BenchmarkRemote"
 remote.Parent = ReplicatedStorage
 
+local remoteFunction = Instance.new("RemoteFunction")
+remoteFunction.Name = "BenchmarkRemoteFunction"
+remoteFunction.Parent = ReplicatedStorage
+
 local Defs = require(script.Parent.Definitions)
-local Warp = require(ReplicatedStorage.Warp).Server()
 
 Defs.bool1.OnServerEvent:Connect(function(player, data)
 	--print(data)
@@ -31,16 +34,12 @@ Defs.bool6.On(function(player, data)
 	
 end)
 
-Warp.Connect("Booleans", function(player, data)
-
-end)
-
-Defs.bool8.on(function(player, data)
-
-end)
-
-Defs.bool9.On(function(player, data)
+Defs.bool7.On(function(player, data)
 	
+end)
+
+Defs.bool8.Booleans:onServer(function(data, player)
+
 end)
 
 Defs.entities1.OnServerEvent:Connect(function(player, data)
@@ -67,16 +66,17 @@ Defs.entities6.On(function(player, data)
 	
 end)
 
-Warp.Connect("Entities", function(player, data)
+
+Defs.entities7.On(function(player, data)
 	
 end)
 
-Defs.entities8.on(function(player, data)
+Defs.entities8.Entities:onServer(function(data, player)
 	
 end)
 
 Defs.strings1.OnServerEvent:Connect(function(player, data)
-
+	
 end)
 
 Defs.strings2.OnServerEvent:Connect(function(player, data)
@@ -99,12 +99,12 @@ Defs.strings6.On(function(player, data)
 	
 end)
 
-Warp.Connect("Strings", function(player, data)
-	
+Defs.strings7.On(function(player, data)
+
 end)
 
-Defs.strings8.on(function(player, data)
-
+Defs.strings8.Strings:onServer(function(data, player)
+	
 end)
 
 Defs.numbers1.OnServerEvent:Connect(function(player, data)
@@ -131,11 +131,11 @@ Defs.numbers6.On(function(player, data)
 	
 end)
 
-Warp.Connect("Numbers", function(player, data)
+Defs.numbers7.On(function(player, data)
 	
 end)
 
-Defs.numbers8.on(function(player, data)
+Defs.numbers8.Numbers:onServer(function(data, player)
 	
 end)
 
@@ -163,34 +163,61 @@ Defs.dict6.On(function(player, data)
 	
 end)
 
-Warp.Connect("Dict", function(player, data)
+Defs.dict7.On(function(player, data)
 	
 end)
 
-Defs.dict8.on(function(player, data)
+Defs.dict8.Dict:onServer(function(data, player)
 	
 end)
 
-local bools = table.create(500, true)
+Defs.vectors1.OnServerEvent:Connect(function(player, data)
+	
+end)
+
+Defs.vectors2.OnServerEvent:Connect(function(player, data)
+	
+end)
+
+Defs.vectors3.OnServerEvent:Connect(function(player, data)
+	
+end)
+
+Defs.vectors4.VectorsTest.listen(function(data, player)
+	
+end)
+
+Defs.vectors5:Connect(function(player, data)
+	
+end)
+
+Defs.vectors6.On(function(player, data)
+	
+end)
+
+Defs.vectors8.Vectors:onServer(function(data, player)
+	
+end)
+
 Defs.remoteFunction1.OnServerInvoke = function(player, data)
-	return bools
+	return data
 end
 
 Defs.remoteFunction2.On(function(player, data)
-	return bools
+	return data
 end)
 
 Defs.remoteFunction3.On(function(player, data)
-	return bools
+	return data
 end)
 
-Defs.changingNumbers1.OnServerEvent:Connect(function(player, data)
-	
-end)
+Defs.remoteFunction4.OnInvoke = function(player, data)
+	return data
+end
 
-Warp.Connect("ChangingNumbers", function(player, data)
-	
-end)
+Defs.remoteFunction5.OnServerInvoke = function(player, data)
+	return data
+end
 
-return {}
+return nil
 

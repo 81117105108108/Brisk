@@ -22,6 +22,23 @@ Despite QuickNet's high performance, it is very easy to use. No plugins, install
 - [Quickstart](quickstart.md)
 
 ## Updates
+### v0.4.0 (10/10/26)
+* Added data.custom type: this method provides a hook for custom serialization so you can provide your own encode/decode functions for arbitrary data. Custom serialization can be significantly faster than the built in serialization in some cases, such as when your data is complex
+* Added new serialized types: Font and Ray
+* Added/improved error messages across the board, from fire paths to schema parser
+* Optimized string serialization by ~15% in some cases
+* Optimized struct serialization by ~15% in some cases
+* Removed buffer library variables from Serialize file: upvalues are generally slower than getimport and most likely the variables were getting compiled to getimport calls anyways. The previously observed performance benefit was most likely just benchmark noise
+* Internal signal implementation changed from dictionary to linked list. Reentrant behavior should now be consistent (disconnecting yourself runs callback, disconnecting others skips them if they haven't been visited yet)
+* Connection objects are now metatables and connection type renamed from QuickNetConnection to Connection
+* Fixed Once and Wait methods calling connect/disconnect through the object table instead of calling the local functions directly
+* Fixed fastUnpack function returning extra nils, which could've caused a correctness issue in an edge case where the user uses the select() function to read callback arguments
+* Fixed buffers cache size counter going out of sync with the actual number of buffers in the cache (not a correctness bug, but caused extra ejections from the cache)
+* Fixed table pool size being off by 1
+* Removed unused "onceCallbacks" table allocation
+* Added safety guard for exceeding 80% of the static allocation on both client and server
+* Constant variables now use const instead of local
+
 ### v0.3.5 (9/7/26)
 * Optimization for FireAllClients, FireClients, and FireAllExcept: instead of serializing the data for each individual player, QuickNet now serializes for only one player then copies the bytes directly for the remaining players. This should be a massive performance boost for games with large server size
 * Server side player buffer recycling removed: performance benefit was negligible and had a conflict with the new optimization

@@ -1,8 +1,8 @@
 
 export type Signal<T...> = {
-	Connect: (self: Signal<T...>, callback: (T...) -> ()) -> QuickNetConnection,
-	ConnectAsync: (self: Signal<T...>, callback: (T...) -> ()) -> QuickNetConnection,
-	Once: (self: Signal<T...>, callback: (T...) -> ()) -> QuickNetConnection,
+	Connect: (self: Signal<T...>, callback: (T...) -> ()) -> Connection,
+	ConnectAsync: (self: Signal<T...>, callback: (T...) -> ()) -> Connection,
+	Once: (self: Signal<T...>, callback: (T...) -> ()) -> Connection,
 	Wait: (self: Signal<T...>) -> T...,
 }
 
@@ -33,10 +33,9 @@ export type NetworkEvent<A...> = {
 	FireServer: (self: NetworkEvent<A...>, A...) -> (),
 }
 
-export type QuickNetConnection = {
+export type Connection = {
 	Connected: boolean,
-	Disconnect: (self: QuickNetConnection) -> (),
-	Destroy: (self: QuickNetConnection) -> (),
+	Disconnect: (self: Connection) -> (),
 }
 
 export type NetworkInfo<A..., B...> = {
@@ -46,11 +45,8 @@ export type NetworkInfo<A..., B...> = {
 	RateLimit: {Time: number, Max: number},
 	SendSchema: {any},
 	ResponseSchema: {any}?,
-	Callbacks: {[QuickNetConnection]: (...any) -> (...any)},
-	AsyncCallbacks: {[QuickNetConnection]: (...any) -> (...any)},
-	OnceCallbacks: {[QuickNetConnection]: (...any) -> ()},
-	NumOnceCallbacks: number,
-	WaitThreads: {thread},
+	Signal: {_head: Connection},
+	AsyncSignal: {_head: Connection},
 	Object: NetworkEvent<A...> | NetworkFunction<A..., B...>,
 	ResponseTimeout: number,
 }
@@ -66,7 +62,4 @@ export type Queue = {
 
 export type Literal = number | string | boolean | Vector3
 
-local module = {}
-
-
-return module
+return nil

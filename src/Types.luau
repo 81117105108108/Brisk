@@ -1,12 +1,6 @@
 --!strict
 
--- [Shared] ReplicatedStorage/Serialization/Types.luau
--- Complete type definitions for the Quanta serialization & networking framework.
--- Optimized for Luau's type solver, native codegen, and strict-mode verification.
-
--- ============================================================================
 -- 1. SIGNALS & LIFETIME MANAGEMENT
--- ============================================================================
 
 export type Connection = {
 	Connected: boolean,
@@ -33,9 +27,7 @@ export type Signal<T...> = {
 	Destroy: (self: Signal<T...>) -> (),
 }
 
--- ============================================================================
 -- 2. SERIALIZATION & SCHEMAS
--- ============================================================================
 
 export type Literal = string | number | boolean | Vector3
 
@@ -55,9 +47,7 @@ export type CustomSerializer<T, M = any> = {
 	Metadata: M?,
 }
 
--- ============================================================================
 -- 3. RATE LIMITING & SECURITY
--- ============================================================================
 
 export type RateLimitConfig = {
 	Max: number,
@@ -72,9 +62,7 @@ export type RateLimitState = {
 -- Middleware pipeline for payload sanitization, logging, or authorization
 export type Middleware<A...> = (player: Player?, A...) -> boolean
 
--- ============================================================================
 -- 4. NETWORK INVOCATIONS & EVENTS
--- ============================================================================
 
 export type NetworkType = number -- Matches Enums.Reliable, Enums.Unreliable, Enums.Function
 
@@ -126,9 +114,7 @@ export type NetworkInfo<A..., B...> = {
 	Middleware: Middleware<A...>?,
 }
 
--- ============================================================================
 -- 5. BUFFER QUEUES & TRANSPORT
--- ============================================================================
 
 -- Outgoing packet batching queue for high-density frame aggregation
 export type OutgoingQueue = {

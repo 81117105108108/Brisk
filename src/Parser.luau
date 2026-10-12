@@ -1,396 +1,481 @@
+--!strict
+--!native
+--!optimize 2
+
+-- Compiles declarative table definitions, literals, unions, and custom types
+-- into optimized, low-overhead schemas consumable by the serialization engine.
+
 local Enums = require(script.Parent.Enums)
 local EnumsToNative = require(script.Parent.EnumsToNativeTypes)
 local Types = require(script.Parent.Types)
 
-local SOURCE = "[QuickNet]"
+export type SchemaArg = Types.SchemaArg
+export type Literal = Types.Literal
 
-local function keyValueSwap(tbl: {[any]: any}): {[any]: any}
-	local new = {}
+local SOURCE = "[Quanta]"
+
+local function keyValueSwap<K, V>(tbl: { [K]: V }): { [V]: K }
+	local new: { [V]: K } = {}
 	for k, v in tbl do
 		new[v] = k
 	end
-	return new
+	return table.freeze(new)
 end
 
-local reverseEnums = keyValueSwap(Enums)
+local reverseEnums: { [number]: string } = keyValueSwap(Enums)
 
-local fastPaths = {
-	Array = {
+local fastPaths = table.freeze({
+	Array = table.freeze({
 		[Enums.NumberU4] = Enums.FastNumberU4Array,
 		[Enums.NumberU8] = Enums.FastNumberU8Array,
 		[Enums.NumberI32] = Enums.FastNumberI32Array,
 		[Enums.NumberF32] = Enums.FastNumberF32Array,
 		[Enums.Boolean] = Enums.FastBoolArray,
 		[Enums.String] = Enums.FastStringArray,
-	},
+	}),
 
-	DictStatic = {
+	DictStatic = table.freeze({
 		[Enums.NumberU4] = Enums.FastNumberU8DictStatic,
 		[Enums.NumberU8] = Enums.FastNumberU8DictStatic,
 		[Enums.NumberI32] = Enums.FastNumberI32DictStatic,
 		[Enums.NumberF32] = Enums.FastNumberF32DictStatic,
 		[Enums.Boolean] = Enums.FastBoolDictStatic,
 		[Enums.String] = Enums.FastStringDictStatic,
-	},
+	}),
 
-	Dict = {
+	Dict = table.freeze({
 		[Enums.NumberU4] = Enums.FastNumberU8Dict,
 		[Enums.NumberU8] = Enums.FastNumberU8Dict,
 		[Enums.NumberI32] = Enums.FastNumberI32Dict,
 		[Enums.NumberF32] = Enums.FastNumberF32Dict,
 		[Enums.Boolean] = Enums.FastBoolDict,
 		[Enums.String] = Enums.FastStringDict,
-	}
-}
+	}),
+})
 
-local function checkSameTypes(data: {any}): (boolean, number)
-	local sameValTypes = true
-	local prevVal = data[1]
+-- Forward declaration for recursive compilation
+local processSchema: (schema: any) -> any
 
-	for _, val in data do
-		if val ~= prevVal then
-			sameValTypes = false
-			break
-		end
-		prevVal = val
+-- Compares elements for homogeneous primitive type array/struct fast-paths
+@native
+local function checkSameTypes(data: { any }): (boolean, any?)
+	local len = #data
+	if len == 0 then
+		return false, nil
 	end
-	return sameValTypes, prevVal
+
+	local first = data[1]
+	for i = 2, len do
+		if data[i] ~= first then
+			return false, first
+		end
+	end
+
+	return true, first
 end
 
---Indexes
---1: Type
---2: Data
---3: FastPath
-local function arrayStatic(data: {any}): {any}
-	local sameTypes, dataType = checkSameTypes(data)
+-- Deterministic key comparator ensuring client and server maintain identical struct byte orders
+@native
+local function sortKeysComparator(a: any, b: any): boolean
+	local aType = type(a)
+	local bType = type(b)
 
-	local schema = {
-		Enums.ArrayStatic, 
-		data,
-		sameTypes and fastPaths.Array[dataType] or nil
+	if aType ~= bType then
+		return aType < bType
+	end
+
+	return a < b
+end
+
+-- ============================================================================
+-- SCHEMA CONSTRUCTORS
+-- ============================================================================
+
+local function arrayStatic(data: { any }): { any }
+	local processed = table.create(#data)
+	for i = 1, #data do
+		processed[i] = processSchema(data[i])
+	end
+
+	local sameTypes, dataType = checkSameTypes(processed)
+	local fastPath = if sameTypes and dataType ~= nil then fastPaths.Array[dataType] else nil
+
+	return {
+		[1] = Enums.ArrayStatic,
+		[2] = processed,
+		[3] = fastPath,
 	}
-	return schema
 end
 
-local function array<T>(data: {T}): {T}
-	local dataType = data[1]
-	local schema = {
-		Enums.Array, 
-		dataType,
-		fastPaths.Array[dataType],
+local function array<T>(data: { T } | T): { any }
+	local rawType = if type(data) == "table" and (data :: any)[1] ~= nil then (data :: any)[1] else data
+	if rawType == nil then
+		error(`{SOURCE} array must specify an element type`, 2)
+	end
+
+	if rawType == Enums.Any then
+		return {
+			[1] = Enums.ArrayDynamic,
+		}
+	end
+
+	local innerData = processSchema(rawType)
+	local fastPath = fastPaths.Array[innerData]
+
+	-- Automatically activate bulk struct-array fast path when element is a static struct
+	if type(innerData) == "table" and innerData[1] == Enums.DictStatic then
+		fastPath = Enums.FastStructArray
+	end
+
+	return {
+		[1] = Enums.Array,
+		[2] = innerData,
+		[3] = fastPath,
 	}
-	return schema
 end
 
-local function arrayDynamic(): {any}
-	local schema = {
-		Enums.ArrayDynamic,
+local function arrayDynamic(): { any }
+	return {
+		[1] = Enums.ArrayDynamic,
 	}
-	return schema
 end
 
-local dictId = 1
-
+local dictCounter = 0
+@native
 local function getDictId(): number
-	local id = dictId
-	dictId += 1
-	return id
+	dictCounter += 1
+	return dictCounter
 end
 
---1: Type
---2: Data
---3: KeysMap
---4: Template
---5: FastPath
-local function dictStatic(data: {[string | number]: any}): {[string | number]: any}
-	local keys = {}
-	for key, val in data do
-		table.insert(keys, key)
+local function dictStatic(data: { [string | number]: any }): { any }
+	local keyCount = 0
+	for _ in data do
+		keyCount += 1
 	end
-	table.sort(keys, function(a, b)
-		local aType = type(a)
-		local bType = type(b)
 
-		if aType ~= bType then
-			return aType < bType
-		end
-		return a < b
-	end)
+	if keyCount == 0 then
+		error(`{SOURCE} static struct cannot be empty`, 2)
+	end
 
-	local vals = {}
+	local keys = table.create(keyCount)
+	local idx = 0
+	for key in data do
+		idx += 1
+		keys[idx] = key
+	end
+
+	table.sort(keys, sortKeysComparator)
+
+	local vals = table.create(keyCount)
 	local template = {}
-	for idx, key in keys do		
-		vals[idx] = data[key]
-		template[key] = 123
-	end	
-	local sameTypes, dataType = checkSameTypes(vals)
 
-	local schema = {
-		Enums.DictStatic,
-		vals,
-		keys,
-		template,
-		sameTypes and fastPaths.DictStatic[dataType] or nil,
+	for i = 1, keyCount do
+		local key = keys[i]
+		vals[i] = processSchema(data[key])
+		template[key] = false -- Pre-allocate shape and hash capacity
+	end
+
+	local sameTypes, dataType = checkSameTypes(vals)
+	local fastPath = if sameTypes and dataType ~= nil then fastPaths.DictStatic[dataType] else nil
+
+	return {
+		[1] = Enums.DictStatic,
+		[2] = vals,
+		[3] = keys,
+		[4] = template,
+		[5] = fastPath,
 	}
-	return schema
 end
 
---1: Type
---2: KeyData
---3: ValueData
---4: KeyFastPath
---5: ValueFastPath
-local function dict<K, V>(data: {[K]: V}): {[K]: V}
-	local keyData, valData = next(data)
-	local keyFastPath = fastPaths.Dict[keyData]
-	local valFastPath = fastPaths.Dict[valData]
+local function dict<K, V>(data: { [K]: V } | (K, V)): { any }
+	local keyType: any
+	local valType: any
 
-	local schema = {
+	if type(data) == "table" then
+		local k, v = next(data :: { [K]: V })
+		if k == nil then
+			error(`{SOURCE} map dictionary cannot be empty`, 2)
+		end
+		keyType = k
+		valType = v
+	else
+		error(`{SOURCE} invalid arguments passed to dict constructor`, 2)
+	end
+
+	if keyType == Enums.Any and valType == Enums.Any then
+		return {
+			[1] = Enums.DictDynamic,
+		}
+	end
+
+	local innerKey = processSchema(keyType)
+	local innerVal = processSchema(valType)
+
+	local keyFastPath = if type(innerKey) == "number" then fastPaths.Dict[innerKey] else nil
+	local valFastPath = if type(innerVal) == "number" then fastPaths.Dict[innerVal] else nil
+
+	-- Automatically activate bulk struct-dict fast path when values are static structs
+	if type(innerVal) == "table" and innerVal[1] == Enums.DictStatic then
+		valFastPath = Enums.FastStructDict
+	end
+
+	return {
 		[1] = Enums.Dict,
-		[2] = keyData,
-		[3] = valData,
+		[2] = innerKey,
+		[3] = innerVal,
 		[4] = keyFastPath,
 		[5] = valFastPath,
 		[6] = getDictId(),
 	}
-	return schema
 end
 
-local function dictDynamic(): {[any]: any}
-	local schema = {
-		Enums.DictDynamic,
-	}
-	return schema
-end
-
-local function optional<T>(dataType: T): T?
-	if dataType == nil then
-		error(`{SOURCE} the input to data.optional cannot be nil`, 2)
-	end
+local function dictDynamic(): { any }
 	return {
-		Enums.Optional,
-		dataType,
+		[1] = Enums.DictDynamic,
 	}
 end
 
-local function parseUnion(data: any, union: {any})
-	local isTable = type(data) == "table"
-
-	if isTable then
-		local enum = data[1]
-		if enum == Enums.Optional then
-			error(`{SOURCE} optional type cannot be unioned`, 2)
-				
-		elseif enum == Enums.Any then
-			error(`{SOURCE} Any type cannot be unioned`, 2)
-				
-		elseif enum == Enums.Literal then
-			error(`{SOURCE} literal types cannot be unioned`, 2)
-		end
-		if union.table ~= nil then
-			error(`{SOURCE} Cannot union multiple tables`, 2)
-		end
-		union.table = data
-	else
-		local native = EnumsToNative[data]
-		if not native then
-			error(`{SOURCE} invalid union type`, 2)
-		end
-		if union[native] ~= nil then
-			error(`{SOURCE} cannot union multiple types of the same native type`, 2)
-		end
-		union[native] = data
+local function optional<T>(dataType: T): { any }
+	if dataType == nil then
+		error(`{SOURCE} input to optional cannot be nil`, 2)
 	end
+
+	return {
+		[1] = Enums.Optional,
+		[2] = processSchema(dataType),
+	}
 end
 
-local function union<T1, T2>(data1: T1, data2: T2): T1 | T2
-	local union = {}
-	parseUnion(data1, union)
-	parseUnion(data2, union)
-	union[1] = Enums.Union
-	return union
-end
-
-local function unionMany<T...>(...: T...): any
-	local union = {}
-	for _, data in {...} do
-		parseUnion(data, union)
+local function buildUnion(branches: { any }): { [any]: any }
+	if #branches < 2 then
+		error(`{SOURCE} union must contain at least 2 types`, 2)
 	end
-	union[1] = Enums.Union
-	return union
+
+	local unionSchema: { [any]: any } = {
+		[1] = Enums.Union,
+	}
+
+	for _, rawBranch in branches do
+		local branch = processSchema(rawBranch)
+		local isTable = type(branch) == "table"
+
+		if isTable then
+			local enumTag = branch[1]
+			if enumTag == Enums.Optional then
+				error(`{SOURCE} optional type cannot be unioned`, 2)
+			elseif enumTag == Enums.Any then
+				error(`{SOURCE} Any type cannot be unioned`, 2)
+			elseif enumTag == Enums.Literal then
+				error(`{SOURCE} literal types cannot be unioned`, 2)
+			elseif enumTag == Enums.Union then
+				error(`{SOURCE} cannot nest a union directly inside another union`, 2)
+			end
+
+			if unionSchema.table ~= nil then
+				error(`{SOURCE} cannot union multiple table types (cannot discriminate at runtime)`, 2)
+			end
+
+			unionSchema.table = branch
+			unionSchema[enumTag] = branch
+		else
+			local native = EnumsToNative[branch]
+			if not native then
+				error(`{SOURCE} invalid union type enum '{tostring(branch)}'`, 2)
+			end
+
+			if unionSchema[native] ~= nil then
+				error(`{SOURCE} cannot union multiple types of the same native type '{native}'`, 2)
+			end
+
+			unionSchema[native] = branch
+			unionSchema[branch] = branch
+		end
+	end
+
+	return unionSchema
 end
 
-local function literal<T...>(...: T...): Types.Literal
-	local map = {...}
-	for _, val in map do
+local function union<T1, T2>(data1: T1, data2: T2): any
+	return buildUnion({ data1, data2 })
+end
+
+local function unionMany(...: any): any
+	return buildUnion({ ... })
+end
+
+local function literal(...: any): { any }
+	local map = { ... }
+	local count = #map
+
+	if count == 0 then
+		error(`{SOURCE} literal must have at least one value`, 2)
+	end
+
+	if count > 255 then
+		error(`{SOURCE} literal cannot have more than 255 values (exceeds u8 wire index)`, 2)
+	end
+
+	local reverseMap: { [any]: number } = {}
+	for i = 1, count do
+		local val = map[i]
 		local dt = typeof(val)
 		if dt ~= "string" and dt ~= "number" and dt ~= "boolean" and dt ~= "Vector3" then
-			error(`{SOURCE} unsupported literal type: {dt}`, 2)
+			error(`{SOURCE} unsupported literal type: '{dt}'`, 2)
 		end
+
+		if reverseMap[val] ~= nil then
+			error(`{SOURCE} duplicate literal value '{tostring(val)}'`, 2)
+		end
+
+		reverseMap[val] = i
 	end
-	local reverseMap = keyValueSwap(map)
-	local literal = {
-		Enums.Literal,
-		map,
-		reverseMap,
+
+	return {
+		[1] = Enums.Literal,
+		[2] = map,
+		[3] = reverseMap,
 	}
-	return literal
 end
 
 local function custom(
-	encode: (buff: buffer, offset: number, value: any, instances: {Instance}, metadata: any) -> number, 
-	decode: (buff: buffer, offset: number, instances: {Instance}?, metadata: any) -> (any, number),
-	metadata: any): any
-	
+	encode: (buff: buffer, offset: number, value: any, instances: { Instance }, metadata: any) -> number,
+	decode: (buff: buffer, offset: number, instances: { Instance }?, metadata: any) -> (any, number),
+	metadata: any
+): { any }
 	if type(encode) ~= "function" then
-		error(`{SOURCE} First argument must be a function`, 2)
+		error(`{SOURCE} First argument to custom() must be an encode function`, 2)
 	end
-	
+
 	if type(decode) ~= "function" then
-		error(`{SOURCE} Second argument must be a function`, 2)
+		error(`{SOURCE} Second argument to custom() must be a decode function`, 2)
 	end
-	
+
 	return {
-		Enums.Custom,
-		encode,
-		decode,
-		metadata,
+		[1] = Enums.Custom,
+		[2] = encode,
+		[3] = decode,
+		[4] = metadata,
 	}
 end
 
-local function updateTableStructFastPath(innerData: any, newSchema: any, idx: number, enum: number)
-	if type(innerData) == "table" then
-		if innerData[1] == Enums.DictStatic then
-			newSchema[idx] = enum
-		end
-	end
-end
+-- ============================================================================
+-- SCHEMA RECURSIVE COMPILER & NORMALIZER
+-- ============================================================================
 
-local function processSchema(schema: {[any]: any})
+local COMPILED_TAGS = table.freeze({
+	[Enums.Array] = true,
+	[Enums.ArrayStatic] = true,
+	[Enums.ArrayDynamic] = true,
+	[Enums.Dict] = true,
+	[Enums.DictStatic] = true,
+	[Enums.DictDynamic] = true,
+	[Enums.Optional] = true,
+	[Enums.Union] = true,
+	[Enums.Literal] = true,
+	[Enums.Custom] = true,
+})
+
+processSchema = function(schema: any): any
+	-- Primitive Enum validation
 	if type(schema) ~= "table" then
 		if not reverseEnums[schema] then
-			error(`{SOURCE} invalid data type`, 2)
-		end
-		return schema
-	end
-	
-	local dt = schema[1]
-	if dt == Enums.Custom then
-		return schema
-	end
-	
-	if dt == Enums.Literal then
-		return schema
-	end
-	
-	if dt == Enums.Optional then
-		schema[2] = processSchema(schema[2])
-		return schema
-	end
-	
-	if dt == Enums.Union then
-		local reverseMap = {}
-		for k, val in schema do
-			if type(k) ~= "string" then
-				continue
-			end			
-			local processed = processSchema(val)
-			schema[k] = processed
-			
-			local enum
-			if type(processed) == "table" then
-				enum = processed[1]
-			else
-				enum = processed
-			end			
-			reverseMap[enum] = processed
-		end
-		
-		for enum, processed in reverseMap do
-			schema[enum] = processed
+			error(`{SOURCE} invalid data type enum: {tostring(schema)}`, 2)
 		end
 		return schema
 	end
 
-	local newSchema
-	local isArrayStatic = true
+	local tag = schema[1]
+
+	-- Idempotency: bypass recompiling already-processed schemas
+	if COMPILED_TAGS[tag] then
+		if tag == Enums.Optional then
+			schema[2] = processSchema(schema[2])
+		elseif tag == Enums.ArrayStatic then
+			for i, v in schema[2] do
+				schema[2][i] = processSchema(v)
+			end
+		end
+		return schema
+	end
+
+	-- Analyze table morphology
 	local count = 0
-	for i, arg in schema do
+	local isArrayStatic = true
+	local firstKey = nil
+
+	for k in schema do
 		count += 1
-		if i ~= count then
+		if count == 1 then
+			firstKey = k
+		end
+		if k ~= count then
 			isArrayStatic = false
 		end
 	end
 
-	local k, v = next(schema)
-	if k == nil and v == nil then
-		error(`{SOURCE} Empty table is not a valid schema`, 2)
+	if count == 0 or firstKey == nil then
+		error(`{SOURCE} Empty table is not a valid schema definition`, 2)
 	end
-	local isArray = count == 1 and k == 1
-	local isDict = not isArray and count == 1
-	local isDictStatic = not isArrayStatic and count > 1
 
-	if isArray then
-		newSchema = array(schema)
-		local data = newSchema[2]
-		if data == Enums.Any then
-			newSchema = arrayDynamic()
+	-- Morphological Classification
+	if count == 1 then
+		if firstKey == 1 then
+			-- Sequential 1-element table: dynamic list `{ Enums.NumberU32 }`
+			return array(schema)
+		elseif reverseEnums[firstKey] ~= nil or firstKey == Enums.Any then
+			-- Key is a type enum: map dictionary `{ [Enums.String] = Enums.NumberU32 }`
+			return dict(schema)
 		else
-			local innerData = processSchema(data)
-			updateTableStructFastPath(innerData, newSchema, 3, Enums.FastStructArray)
-			newSchema[2] = innerData
+			-- Key is a string field name: single-field struct `{ name = Enums.String }`
+			return dictStatic(schema)
 		end
-
 	elseif isArrayStatic then
-		newSchema = arrayStatic(schema)
-		local data = newSchema[2]
-		local newData = {}
-		for i, val in data do
-			newData[i] = processSchema(val)
-		end
-		newSchema[2] = newData
-
-	elseif isDict then
-		newSchema = dict(schema)
-		local key = newSchema[2]
-		local val = newSchema[3]
-		if key == Enums.Any and val == Enums.Any then
-			newSchema = dictDynamic()
-		else
-			newSchema[2] = processSchema(key)
-			local innerVal = processSchema(val)
-			updateTableStructFastPath(innerVal, newSchema, 5, Enums.FastStructDict)
-			newSchema[3] = innerVal
-		end
-
-	elseif isDictStatic then
-		newSchema = dictStatic(schema)
-		local vals = newSchema[2]
-		for i, val in vals do
-			vals[i] = processSchema(val)
-		end
-
+		-- Multi-element sequential array: fixed tuple `{ Enums.NumberU32, Enums.String }`
+		return arrayStatic(schema)
 	else
-		error(`{SOURCE} invalid schema`, 2)
+		-- Multi-element non-sequential table: static struct `{ x = Enums.F32, y = Enums.F32 }`
+		return dictStatic(schema)
 	end
-	return newSchema
 end
 
-local function getSchema(...)
-	local args = {...}
-	for i, arg in args do
-		args[i] = processSchema(arg)
+local function compileSchema(...: any): any
+	local count = select("#", ...)
+	if count == 0 then
+		error(`{SOURCE} compileSchema requires at least one argument`, 2)
 	end
-	return args
+
+	if count == 1 then
+		return processSchema((...))
+	end
+
+	local compiled = table.create(count)
+	for i = 1, count do
+		compiled[i] = processSchema(select(i, ...))
+	end
+
+	return compiled
 end
 
-local Parser = {
-	getSchema = getSchema,
+local Parser = table.freeze({
+	-- Primary Compilation
+	compile = compileSchema,
+	getSchema = compileSchema, -- Backwards compatibility alias
+
+	-- Explicit Type Constructors
+	array = array,
+	arrayStatic = arrayStatic,
+	arrayDynamic = arrayDynamic,
+	dict = dict,
+	dictStatic = dictStatic,
+	dictDynamic = dictDynamic,
 	optional = optional,
 	union = union,
 	unionMany = unionMany,
 	literal = literal,
 	custom = custom,
-}
+
+	-- Reflection
+	fastPaths = fastPaths,
+})
 
 return Parser

@@ -12,7 +12,7 @@ local Types = require(script.Parent.Types)
 export type SchemaArg = Types.SchemaArg
 export type Literal = Types.Literal
 
-local SOURCE = "[Quanta]"
+local SOURCE = "[Brisk]"
 
 local function keyValueSwap<K, V>(tbl: { [K]: V }): { [V]: K }
 	local new: { [V]: K } = {}

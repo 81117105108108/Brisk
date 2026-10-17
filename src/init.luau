@@ -1,10 +1,5 @@
 --!optimize 2
 
---[[
-QuickNet
-author: u5eful
-]]
-
 --Services--
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
@@ -912,8 +907,8 @@ local function getServerQueue(): Queue
 end
 
 local function start()
-	internalRemote = getRemote("QuickNetRemote")
-	internalUnreliable = getUnreliable("QuickNetUnreliable")
+	internalRemote = getRemote("BriskRemote")
+	internalUnreliable = getUnreliable("BriskUnreliable")
 	if isServer then
 		local function initPlayer(player: Player)
 			serverQueue[player] = getServerQueue()
@@ -940,18 +935,18 @@ local function start()
 		internalRemote.OnClientEvent:Connect(remoteListenerClientPcall)
 		internalUnreliable.OnClientEvent:Connect(remoteListenerClientPcall)
 	end
-	print(`{SOURCE} QuickNet {VERSION} initialized!`)
+	print(`{SOURCE} Brisk {VERSION} initialized!`)
 end
 
 --Public--
-local QuickNet = {}
-QuickNet.Data = DataTypes
+local Brisk = {}
+Brisk.Data = DataTypes
 local enumItems = Serialize.enumItems
 local enumItemsByEnum = Serialize.enumItemsByEnum
 local enumId = 1
 local enumFile = script.Serialize
 
-function QuickNet:addEnumItems(enums: {EnumItem})
+function Brisk:addEnumItems(enums: {EnumItem})
 	for _, enum in enums do
 		local type = tostring(enum.EnumType)
 		local name = enum.Name
@@ -981,15 +976,15 @@ end
 
 --[[
 Example usage:
-local data = QuickNet.Data
+local data = Brisk.Data
 
-local myEvent = QuickNet:register("EventName", data.NumberU8, data.String)
+local myEvent = Brisk:register("EventName", data.NumberU8, data.String)
 
-local myUnreliable = QuickNet:register("UnreliableName", data.CFrameF32):Unreliable()
+local myUnreliable = Brisk:register("UnreliableName", data.CFrameF32):Unreliable()
 
-local myFunction = QuickNet:register("FunctionName", data.Color3):Response(data.Boolean)
+local myFunction = Brisk:register("FunctionName", data.Color3):Response(data.Boolean)
 ]]
-function QuickNet:register<A..., B...>(name: string, ...: A...): NetworkEvent<A...>
+function Brisk:register<A..., B...>(name: string, ...: A...): NetworkEvent<A...>
 	if namesRegistered[name] then
 		errorMsg(`{name} already exists (names must be unique)`)
 		return
@@ -1014,6 +1009,6 @@ end
 --start module
 start()
 	
-export type QuickNet = typeof(QuickNet)
+export type Brisk = typeof(Brisk)
 
-return QuickNet
+return Brisk

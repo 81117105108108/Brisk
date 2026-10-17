@@ -18,8 +18,8 @@ local Config = require(script.Config)
 local Types = require(script.Types)
 
 --Config--
-const VERSION = "v0.4.0"
-const SOURCE = "[QuickNet]"
+const VERSION = "v0.5"
+const SOURCE = "[Brisk]"
 const DEBUG_MODE = Config.DebugMode
 const RATE_LIMIT = Config.DefaultRateLimit
 const MAX_CALLS_PER_FRAME = Config.MaxCallsPerFrame
